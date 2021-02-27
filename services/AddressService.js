@@ -1,55 +1,78 @@
 const bitcoin = require('bitcoinjs-lib')
 const fetch = require('node-fetch')
+const coininfo = require('coininfo')
 const networks = require('../networks')
 
 const sochainApiUrl = 'https://sochain.com/api/v2/'
 const getAddrApi = 'get_address_balance/'
 
-const LITECOIN = {
-  messagePrefix: '\x19Litecoin Signed Message:\n',
-  bech32: 'ltc',
-  bip32: {
-    public: 0x019da462,
-    private: 0x019d9cfe
-  },
-  pubKeyHash: 0x30,
-  scriptHash: 0x32,
-  wif: 0xb0
-}
+function generateNetwork (crypto) {
+  const curr = coininfo[crypto].main
+  const frmt = curr.toBitcoinJS()
+  let bechVal
 
-const BITCOIN = {
-  messagePrefix: '\x18Bitcoin Signed Message:\n',
-  bech32: 'bc',
-  bip32: {
-    public: 0x0488b21e,
-    private: 0x0488ade4
-  },
-  pubKeyHash: 0x00,
-  scriptHash: 0x05,
-  wif: 0x80
+  switch (crypto) {
+    case 'dogecoin':
+      bechVal = 'dc'
+      break
+    case 'litecoin':
+      bechVal = 'ltc'
+      break
+    default:
+      bechVal = 'bc'
+      break
+  }
+
+  const netGain = {
+    messagePrefix: '\x19' + frmt.name + ' Signed Message:\n',
+    bip32: {
+      public: frmt.bip32.public,
+      private: frmt.bip32.private
+    },
+    bech32: bechVal,
+    pubKeyHash: frmt.pubKeyHash,
+    scriptHash: frmt.scriptHash,
+    wif: frmt.wif
+  }
+  return netGain
 }
 
 const AddressService = function () {}
 
 // generate a P2SH, pay-to-multisig (2-of-2) address
-AddressService.prototype.generateDefaultBlockioAddress = (bip32PrivKey, secondaryPubKey, crypto) => {
-  let network
+AddressService.prototype.generateDefaultBlockioAddress = (bip32PrivKey, secondaryPubKey, crypto, i) => {
+  let network = {}
 
   switch (crypto) {
-    case networks.BITCOIN:
-      network = BITCOIN
+    case networks.DOGECOIN:
+      network = generateNetwork('dogecoin')
       break
     case networks.LITECOIN:
-      network = LITECOIN
+      i = 0
+      network = generateNetwork('litecoin')
+      break
+    default:
+      i = 0
+      network = generateNetwork('bitcoin')
       break
   }
 
-  const PUB1 = bitcoin.bip32.fromBase58(bip32PrivKey, network).derivePath('m/0/0').publicKey
+  const PUB1 = bitcoin.bip32.fromBase58(bip32PrivKey, network).derivePath('m/' + i + '/0').publicKey
   const PUB2 = Buffer.from(secondaryPubKey, 'hex')
-
   const pubkeys = [PUB1, PUB2]
+
+  // only for dogecoin, network needs to be provided in p2ms options
+  const p2msOpts = {
+    m: 2,
+    pubkeys,
+    network: network
+  }
+  if (crypto !== networks.DOGECOIN) {
+    delete p2msOpts.network
+  }
+
   const address = bitcoin.payments.p2sh({
-    redeem: bitcoin.payments.p2ms({ m: 2, pubkeys })
+    redeem: bitcoin.payments.p2ms(p2msOpts)
   })
   return address.address
 }
@@ -59,11 +82,13 @@ AddressService.prototype.generateSubsequentBlockioAddress = (bip32PrivKey, secon
   let network
 
   switch (crypto) {
-    case networks.BITCOIN:
-      network = BITCOIN
-      break
+    case networks.DOGECOIN:
+      return 'Dogecoin only supports P2SH'
     case networks.LITECOIN:
-      network = LITECOIN
+      network = generateNetwork('litecoin')
+      break
+    default:
+      network = generateNetwork('bitcoin')
       break
   }
 
@@ -84,11 +109,13 @@ AddressService.prototype.generateP2wshBlockioAddress = (bip32PrivKey, secondaryP
   let network
 
   switch (crypto) {
-    case networks.BITCOIN:
-      network = BITCOIN
-      break
+    case networks.DOGECOIN:
+      return 'Dogecoin only supports P2SH'
     case networks.LITECOIN:
-      network = LITECOIN
+      network = generateNetwork('litecoin')
+      break
+    default:
+      network = generateNetwork('bitcoin')
       break
   }
   const PUB1 = bitcoin.bip32.fromBase58(bip32PrivKey, network).derivePath('m/' + i + '/0').publicKey
