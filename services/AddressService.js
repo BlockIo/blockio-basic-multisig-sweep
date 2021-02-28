@@ -133,9 +133,9 @@ AddressService.prototype.checkBlockioAddressBalance = async (addr, network) => {
     const apiUrl = sochainApiUrl + getAddrApi + network + '/' + addr
     const res = await fetch(apiUrl)
     const json = await res.json()
-    console.log(json)
+    return json
   } catch (err) {
-    console.log(err.response.body)
+    return err.response.body
   }
 }
 
