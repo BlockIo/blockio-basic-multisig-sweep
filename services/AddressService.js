@@ -4,24 +4,12 @@ const coininfo = require('coininfo')
 const networks = require('../networks')
 
 const sochainApiUrl = 'https://sochain.com/api/v2/'
-const getAddrApi = 'get_address_balance/'
+const getAddrApi = 'get_tx_unspent/'
 
-function generateNetwork (crypto) {
-  const curr = coininfo[crypto].main
+function generateNetwork (crypto, isTestnet) {
+  const net = isTestnet ? 'test' : 'main'
+  const curr = coininfo[crypto][net]
   const frmt = curr.toBitcoinJS()
-  let bechVal
-
-  switch (crypto) {
-    case 'dogecoin':
-      bechVal = 'dc'
-      break
-    case 'litecoin':
-      bechVal = 'ltc'
-      break
-    default:
-      bechVal = 'bc'
-      break
-  }
 
   const netGain = {
     messagePrefix: '\x19' + frmt.name + ' Signed Message:\n',
@@ -29,7 +17,7 @@ function generateNetwork (crypto) {
       public: frmt.bip32.public,
       private: frmt.bip32.private
     },
-    bech32: bechVal,
+    bech32: frmt.bech32,
     pubKeyHash: frmt.pubKeyHash,
     scriptHash: frmt.scriptHash,
     wif: frmt.wif
@@ -45,15 +33,19 @@ AddressService.prototype.generateDefaultBlockioAddress = (bip32PrivKey, secondar
 
   switch (crypto) {
     case networks.DOGECOIN:
-      network = generateNetwork('dogecoin')
+      network = generateNetwork('dogecoin', false)
       break
     case networks.LITECOIN:
       i = 0
-      network = generateNetwork('litecoin')
+      network = generateNetwork('litecoin', false)
+      break
+    case networks.BITCOIN_TEST:
+      i = 0
+      network = generateNetwork('bitcoin', true)
       break
     default:
       i = 0
-      network = generateNetwork('bitcoin')
+      network = generateNetwork('bitcoin', false)
       break
   }
 
@@ -67,7 +59,7 @@ AddressService.prototype.generateDefaultBlockioAddress = (bip32PrivKey, secondar
     pubkeys,
     network: network
   }
-  if (crypto !== networks.DOGECOIN) {
+  if (crypto !== networks.DOGECOIN && crypto !== networks.BITCOIN_TEST) {
     delete p2msOpts.network
   }
 
@@ -85,20 +77,32 @@ AddressService.prototype.generateSubsequentBlockioAddress = (bip32PrivKey, secon
     case networks.DOGECOIN:
       return 'Dogecoin only supports P2SH'
     case networks.LITECOIN:
-      network = generateNetwork('litecoin')
+      network = generateNetwork('litecoin', false)
+      break
+    case networks.BITCOIN_TEST:
+      network = generateNetwork('bitcoin', true)
       break
     default:
-      network = generateNetwork('bitcoin')
+      network = generateNetwork('bitcoin', false)
       break
   }
 
   const PUB1 = bitcoin.bip32.fromBase58(bip32PrivKey, network).derivePath('m/' + i + '/0').publicKey
   const PUB2 = Buffer.from(secondaryPubKey, 'hex')
-
   const pubkeys = [PUB1, PUB2]
+
+  const p2msOpts = {
+    m: 2,
+    pubkeys,
+    network: network
+  }
+  if (crypto !== networks.BITCOIN_TEST) {
+    delete p2msOpts.network
+  }
+
   const address = bitcoin.payments.p2sh({
     redeem: bitcoin.payments.p2wsh({
-      redeem: bitcoin.payments.p2ms({ m: 2, pubkeys })
+      redeem: bitcoin.payments.p2ms(p2msOpts)
     })
   })
   return address.address
@@ -112,10 +116,13 @@ AddressService.prototype.generateP2wshBlockioAddress = (bip32PrivKey, secondaryP
     case networks.DOGECOIN:
       return 'Dogecoin only supports P2SH'
     case networks.LITECOIN:
-      network = generateNetwork('litecoin')
+      network = generateNetwork('litecoin', false)
+      break
+    case networks.BITCOIN_TEST:
+      network = generateNetwork('bitcoin', true)
       break
     default:
-      network = generateNetwork('bitcoin')
+      network = generateNetwork('bitcoin', false)
       break
   }
   const PUB1 = bitcoin.bip32.fromBase58(bip32PrivKey, network).derivePath('m/' + i + '/0').publicKey
@@ -133,6 +140,7 @@ AddressService.prototype.checkBlockioAddressBalance = async (addr, network) => {
     const apiUrl = sochainApiUrl + getAddrApi + network + '/' + addr
     const res = await fetch(apiUrl)
     const json = await res.json()
+    console.log(json.data.txs)
     return json
   } catch (err) {
     return err.response.body
