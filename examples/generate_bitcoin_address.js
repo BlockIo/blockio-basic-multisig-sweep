@@ -11,7 +11,7 @@ const subsequentAddr = AddressService.generateSubsequentBlockioAddress(btcBip32P
 const nativeSegwitAddr = AddressService.generateP2wshBlockioAddress(btcBip32Priv, btcSecondaryPubKey, 5, networks.BITCOIN_TEST)
 
 console.log(defaultAddr)
-console.log(subsequentAddr, "Subsequent")
+console.log(subsequentAddr)
 console.log(nativeSegwitAddr)
 
-AddressService.checkBlockioAddressBalance(defaultAddr, networks.BITCOIN_TEST)
+AddressService.checkBlockioAddressBalance(subsequentAddr, networks.BITCOIN_TEST)
