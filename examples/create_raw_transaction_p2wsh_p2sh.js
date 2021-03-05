@@ -14,38 +14,21 @@ const btcSecondaryPrivKey = process.env.BTC_SECONDARY_PRIV_KEY
 const psbt = new bitcoin.Psbt({ network: bitcoin.networks.testnet })
 const satoshi = 100000000
 const BITCOIN_FEE = 10000
-const TO_ADDR = '2NCUkmRWQzy82bwRTyDuWDyQ2zhWUVFBCZM'
+const TO_ADDR = '2ND3paQb1iaZGt8CxbAabS4veRJZL1EG2KX'
 // const addr = '2NCUkmRWQzy82bwRTyDuWDyQ2zhWUVFBCZM'
 
-createp2wshTx()
+createp2wshTx(5)
 
-async function createp2wshTx () {
+async function createp2wshTx (addrDerivePath) {
   try {
-    const payment = AddressService.generateSubsequentBlockioAddress(btcBip32Priv, btcSecondaryPubKey, 1, network)
+    const payment = AddressService.generateSubsequentBlockioAddress(btcBip32Priv, btcSecondaryPubKey, addrDerivePath, network)
     const addr = payment.address
     const output = payment.redeem.output
-    let addrUtxo = await AddressService.checkBlockioAddressBalance(addr, network)
-    addrUtxo = addrUtxo.data.txs[0]
-    const input = {
-      hash: addrUtxo.txid,
-      index: addrUtxo.output_no,
-      witnessUtxo: {
-        script: Buffer.from(addrUtxo.script_hex, 'hex'),
-        value: parseFloat(addrUtxo.value) * satoshi
-      },
-      witnessScript: payment.redeem.redeem.output,
-      redeemScript: output
-    }
-
-    psbt.addInput(input)
     const hdRoot = bitcoin.bip32.fromBase58(btcBip32Priv, generateNetwork('bitcoin', true))
     const masterFingerprint = hdRoot.fingerprint
-    const path = 'm/1/0' // default path
+    const path = 'm/' + addrDerivePath + '/0' // default path
     const childNode = hdRoot.derivePath(path)
     const pubkey = childNode.publicKey
-
-    // // console.log(privkey.toString('hex'), privkey2.toString())
-
     const updateData = {
       bip32Derivation: [
         {
@@ -55,27 +38,49 @@ async function createp2wshTx () {
         }
       ]
     }
-    psbt.updateInput(0, updateData)
+    let addrUtxos = await AddressService.checkBlockioAddressBalance(addr, network)
+    addrUtxos = addrUtxos.data.txs
+    let balance = 0
+    let inputNum = 0
+    let addrUtxo
+    for (addrUtxo of addrUtxos) {
+      balance += parseFloat(addrUtxo.value)
+
+      const input = {
+        hash: addrUtxo.txid,
+        index: addrUtxo.output_no,
+        witnessUtxo: {
+          script: Buffer.from(addrUtxo.script_hex, 'hex'),
+          value: parseFloat(addrUtxo.value) * satoshi
+        },
+        witnessScript: payment.redeem.redeem.output,
+        redeemScript: output
+      }
+
+      psbt.addInput(input)
+      psbt.updateInput(inputNum++, updateData)
+    }
     psbt.addOutput({
       address: TO_ADDR, // destination address
-      value: (0.00049690 * satoshi) - BITCOIN_FEE // value in satoshi
+      value: Math.floor((balance * satoshi) - BITCOIN_FEE)// value in satoshi
     })
-
-    psbt.signInputHD(0, hdRoot)
-    psbt.signInput(0, bitcoin.ECPair.fromWIF(btcSecondaryPrivKey, bitcoin.networks.testnet))
+    for (let i = 0; i < inputNum; i++) {
+      psbt.signInputHD(i, hdRoot)
+      psbt.signInput(i, bitcoin.ECPair.fromWIF(btcSecondaryPrivKey, bitcoin.networks.testnet))
+    }
     psbt.finalizeAllInputs()
-    // console.log(psbt.validateSignaturesOfInput(0))
 
     const tx = psbt.extractTransaction()
     const signedTransaction = tx.toHex()
     const transactionId = tx.getId()
     const res = await fetch('https://sochain.com/api/v2/send_tx/BTCTEST', {
       method: 'POST',
-      body: { tx_hex: signedTransaction }
+      body: JSON.stringify({ tx_hex: signedTransaction }),
+      headers: { 'Content-Type': 'application/json' }
     })
     console.log('signed:', signedTransaction)
     console.log('Tx id:', transactionId)
-    console.log('res:', res)
+    console.log('res:', res.json())
   } catch (err) {
     console.log(err)
   }

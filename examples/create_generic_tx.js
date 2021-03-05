@@ -61,7 +61,7 @@ async function createDefaultAddrTx () {
     }
     psbt.addOutput({
       address: TO_ADDR, // destination address
-      value: Math.floor((balance * satoshi) - BITCOIN_FEE)// value in satoshi
+      value: (balance * satoshi) - BITCOIN_FEE// value in satoshi
     })
     for (let i = 0; i < inputNum; i++) {
       psbt.signInputHD(i, hdRoot)
@@ -79,7 +79,7 @@ async function createDefaultAddrTx () {
     })
     console.log('signed:', signedTransaction)
     console.log('Tx id:', transactionId)
-    console.log('res:', res.json())
+    console.log('res:', res)
   } catch (err) {
     console.log(err)
   }
