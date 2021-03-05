@@ -15,8 +15,8 @@ createBtcBalanceMap()
 async function createBtcBalanceMap () {
   while (n) {
     console.log('Evaluating addresses at i=' + n)
-    const p2wsh_p2sh_addr = AddressService.generateSubsequentBlockioAddress(btcBip32Priv, btcSecondaryPubKey, n, network)
-    const p2wsh_addr = AddressService.generateP2wshBlockioAddress(btcBip32Priv, btcSecondaryPubKey, n, network)
+    const p2wsh_p2sh_addr = AddressService.generateSubsequentBlockioAddress(btcBip32Priv, btcSecondaryPubKey, n, network).address
+    const p2wsh_addr = AddressService.generateP2wshBlockioAddress(btcBip32Priv, btcSecondaryPubKey, n, network).address
 
     try {
       const p2wsh_p2sh_addr_utxo = await AddressService.checkBlockioAddressBalance(p2wsh_p2sh_addr, network)
@@ -58,7 +58,7 @@ async function createBtcBalanceMap () {
     n--
   }
   console.log('Evaluating addresses at i=0')
-  const p2sh_addr = AddressService.generateDefaultBlockioAddress(btcBip32Priv, btcSecondaryPubKey, network)
+  const p2sh_addr = AddressService.generateDefaultBlockioAddress(btcBip32Priv, btcSecondaryPubKey, network).address
 
   btcBalanceMap[p2sh_addr] = {}
   btcBalanceMap[p2sh_addr].address_type = constants.P2SH

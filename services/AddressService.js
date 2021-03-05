@@ -63,10 +63,10 @@ AddressService.prototype.generateDefaultBlockioAddress = (bip32PrivKey, secondar
     delete p2msOpts.network
   }
 
-  const address = bitcoin.payments.p2sh({
+  const output = bitcoin.payments.p2sh({
     redeem: bitcoin.payments.p2ms(p2msOpts)
   })
-  return address.address
+  return output
 }
 
 // generate a P2SH(P2WSH(...)), pay-to-multisig (2-of-2) address
@@ -100,12 +100,12 @@ AddressService.prototype.generateSubsequentBlockioAddress = (bip32PrivKey, secon
     delete p2msOpts.network
   }
 
-  const address = bitcoin.payments.p2sh({
+  const output = bitcoin.payments.p2sh({
     redeem: bitcoin.payments.p2wsh({
       redeem: bitcoin.payments.p2ms(p2msOpts)
     })
   })
-  return address.address
+  return output
 }
 
 // generate a P2WSH (SegWit), pay-to-multisig (2-of-2) address
@@ -129,10 +129,10 @@ AddressService.prototype.generateP2wshBlockioAddress = (bip32PrivKey, secondaryP
   const PUB2 = Buffer.from(secondaryPubKey, 'hex')
 
   const pubkeys = [PUB1, PUB2]
-  const address = bitcoin.payments.p2wsh({
+  const output = bitcoin.payments.p2wsh({
     redeem: bitcoin.payments.p2ms({ m: 2, pubkeys, network: network })
   })
-  return address.address
+  return output
 }
 
 AddressService.prototype.checkBlockioAddressBalance = async (addr, network) => {
