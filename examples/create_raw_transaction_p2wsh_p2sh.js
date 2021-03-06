@@ -15,7 +15,6 @@ const psbt = new bitcoin.Psbt({ network: bitcoin.networks.testnet })
 const satoshi = 100000000
 const BITCOIN_FEE = 10000
 const TO_ADDR = '2ND3paQb1iaZGt8CxbAabS4veRJZL1EG2KX'
-// const addr = '2NCUkmRWQzy82bwRTyDuWDyQ2zhWUVFBCZM'
 
 createp2wshTx(5)
 
