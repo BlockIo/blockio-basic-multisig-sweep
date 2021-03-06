@@ -2,18 +2,89 @@ const constants = require('./constants')
 const networks = require('./networks')
 const AddressService = require('./services/AddressService')
 const fetch = require('node-fetch')
+const bitcoin = require('bitcoinjs-lib')
+const coininfo = require('coininfo')
 
 require('dotenv').config()
 
 sweepCoins()
 
 async function sweepCoins () {
-  const n = 12
-  const network = networks.BITCOIN_TEST
-  const btcBip32Priv = process.env.BTC_BIP32_PRIV
-  const btcSecondaryPubKey = process.env.BTC_SECONDARY_PUB_KEY
+  try {
+    ///    Initialize vars start
 
-  const utxoMap = await createBtcBalanceMap(btcBip32Priv, btcSecondaryPubKey, n, network)
+    const n = 1
+    const network = networks.BITCOIN_TEST
+    const crypto = 'bitcoin'
+    const isTestnet = true
+    const btcBip32Priv = process.env.BTC_BIP32_PRIV
+    const btcSecondaryPubKey = process.env.BTC_SECONDARY_PUB_KEY
+    const btcSecondaryPrivKey = process.env.BTC_SECONDARY_PRIV_KEY
+    const TO_ADDR = '2ND3paQb1iaZGt8CxbAabS4veRJZL1EG2KX'
+
+    ///    Initialize vars end
+
+    const utxoMap = await createBtcBalanceMap(btcBip32Priv, btcSecondaryPubKey, n, network)
+
+    const psbt = new bitcoin.Psbt({ network: generateNetwork(crypto, isTestnet) })
+
+    const hdRoot = bitcoin.bip32.fromBase58(btcBip32Priv, generateNetwork(crypto, isTestnet))
+    const masterFingerprint = hdRoot.fingerprint
+
+    let balToSweep = 0
+    let inputNum = 0
+    for (const address of Object.keys(utxoMap)) {
+      const path = 'm/' + utxoMap[address].i + '/0' // default path
+      const childNode = hdRoot.derivePath(path)
+      const pubkey = childNode.publicKey
+
+      const updateData = {
+        bip32Derivation: [
+          {
+            masterFingerprint,
+            path,
+            pubkey
+          }
+        ]
+      }
+      for (const utxo of utxoMap[address].tx) {
+        balToSweep += parseFloat(utxo.value)
+        delete utxo.value
+        const input = {
+          ...utxo
+        }
+        psbt.addInput(input)
+        psbt.updateInput(inputNum++, updateData)
+      }
+    }
+    psbt.addOutput({
+      address: TO_ADDR, // destination address
+      value: Math.floor((balToSweep * constants.SAT) - constants.BITCOIN_FEE)// value in satoshi
+    })
+    for (let i = 0; i < inputNum; i++) {
+      psbt.signInputHD(i, hdRoot)
+      psbt.signInput(i, bitcoin.ECPair.fromWIF(btcSecondaryPrivKey, generateNetwork(crypto, isTestnet)))
+    }
+    psbt.finalizeAllInputs()
+
+    const tx = psbt.extractTransaction()
+    const signedTransaction = tx.toHex()
+    let res = await fetch('https://sochain.com/api/v2/send_tx/BTCTEST', {
+      method: 'POST',
+      body: JSON.stringify({ tx_hex: signedTransaction }),
+      headers: { 'Content-Type': 'application/json' }
+    })
+    res = await res.json()
+    if (res.status === 'success') {
+      console.log('Sweep Success!')
+      console.log(res.data.txid)
+    } else {
+      console.log('Sweep Failed:')
+      console.log(res)
+    }
+  } catch (err) {
+    console.log(err)
+  }
 }
 
 async function createBtcBalanceMap (btcBip32Priv, btcSecondaryPubKey, n, network) {
@@ -113,4 +184,23 @@ async function getSochainTxHex (txId, network) {
   } catch (err) {
     return err.response.body
   }
+}
+
+function generateNetwork (crypto, isTestnet) {
+  const net = isTestnet ? 'test' : 'main'
+  const curr = coininfo[crypto][net]
+  const frmt = curr.toBitcoinJS()
+
+  const netGain = {
+    messagePrefix: '\x19' + frmt.name + ' Signed Message:\n',
+    bip32: {
+      public: frmt.bip32.public,
+      private: frmt.bip32.private
+    },
+    bech32: frmt.bech32,
+    pubKeyHash: frmt.pubKeyHash,
+    scriptHash: frmt.scriptHash,
+    wif: frmt.wif
+  }
+  return netGain
 }
