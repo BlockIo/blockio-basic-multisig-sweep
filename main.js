@@ -13,20 +13,23 @@ async function sweepCoins () {
   try {
     ///    Initialize vars start
 
-    const n = 1
+    const MAX_TX_LENGTH = 3
+    const n = 13
     const network = networks.BITCOIN_TEST
     const crypto = 'bitcoin'
     const isTestnet = true
     const btcBip32Priv = process.env.BTC_BIP32_PRIV
     const btcSecondaryPubKey = process.env.BTC_SECONDARY_PUB_KEY
     const btcSecondaryPrivKey = process.env.BTC_SECONDARY_PRIV_KEY
-    const TO_ADDR = '2ND3paQb1iaZGt8CxbAabS4veRJZL1EG2KX'
+    const TO_ADDR = '2NCUkmRWQzy82bwRTyDuWDyQ2zhWUVFBCZM'
+    const TX_API_URL = 'https://sochain.com/api/v2/send_tx/BTCTEST'
 
     ///    Initialize vars end
 
     const utxoMap = await createBtcBalanceMap(btcBip32Priv, btcSecondaryPubKey, n, network)
 
-    const psbt = new bitcoin.Psbt({ network: generateNetwork(crypto, isTestnet) })
+    const psbtArr = []
+    let psbt = new bitcoin.Psbt({ network: generateNetwork(crypto, isTestnet) })
 
     const hdRoot = bitcoin.bip32.fromBase58(btcBip32Priv, generateNetwork(crypto, isTestnet))
     const masterFingerprint = hdRoot.fingerprint
@@ -55,35 +58,54 @@ async function sweepCoins () {
         }
         psbt.addInput(input)
         psbt.updateInput(inputNum++, updateData)
+        if (psbt.txInputs.length === MAX_TX_LENGTH) {
+          psbt.addOutput({
+            address: TO_ADDR, // destination address
+            value: Math.floor((balToSweep * constants.SAT) - constants.BITCOIN_FEE)// value in satoshi
+          })
+          psbtArr.push(psbt)
+          psbt = new bitcoin.Psbt({ network: generateNetwork(crypto, isTestnet) })
+          inputNum = 0
+          balToSweep = 0
+        }
       }
     }
-    psbt.addOutput({
-      address: TO_ADDR, // destination address
-      value: Math.floor((balToSweep * constants.SAT) - constants.BITCOIN_FEE)// value in satoshi
-    })
-    for (let i = 0; i < inputNum; i++) {
-      psbt.signInputHD(i, hdRoot)
-      psbt.signInput(i, bitcoin.ECPair.fromWIF(btcSecondaryPrivKey, generateNetwork(crypto, isTestnet)))
+    if (!psbtArr.length) {
+      psbt.addOutput({
+        address: TO_ADDR, // destination address
+        value: Math.floor((balToSweep * constants.SAT) - constants.BITCOIN_FEE)// value in satoshi
+      })
+      psbtArr.push(psbt)
     }
-    psbt.finalizeAllInputs()
-
-    const tx = psbt.extractTransaction()
-    const signedTransaction = tx.toHex()
-    let res = await fetch('https://sochain.com/api/v2/send_tx/BTCTEST', {
-      method: 'POST',
-      body: JSON.stringify({ tx_hex: signedTransaction }),
-      headers: { 'Content-Type': 'application/json' }
-    })
-    res = await res.json()
-    if (res.status === 'success') {
-      console.log('Sweep Success!')
-      console.log(res.data.txid)
-    } else {
-      console.log('Sweep Failed:')
-      console.log(res)
+    for (const psbt of psbtArr) {
+      for (let i = 0; i < psbt.txInputs.length; i++) {
+        psbt.signInputHD(i, hdRoot)
+        psbt.signInput(i, bitcoin.ECPair.fromWIF(btcSecondaryPrivKey, generateNetwork(crypto, isTestnet)))
+      }
+      psbt.finalizeAllInputs()
+      const tx = psbt.extractTransaction()
+      // console.log('transaction size:', tx.virtualSize())
+      const signedTransaction = tx.toHex()
+      await sendTx(TX_API_URL, signedTransaction)
     }
   } catch (err) {
     console.log(err)
+  }
+}
+
+async function sendTx (apiUrl, txHex) {
+  let res = await fetch(apiUrl, {
+    method: 'POST',
+    body: JSON.stringify({ tx_hex: txHex }),
+    headers: { 'Content-Type': 'application/json' }
+  })
+  res = await res.json()
+  if (res.status === 'success') {
+    console.log('Sweep Success!')
+    console.log(res.data.txid)
+  } else {
+    console.log('Sweep Failed:')
+    console.log(res)
   }
 }
 
