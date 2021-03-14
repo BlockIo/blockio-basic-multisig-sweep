@@ -6,7 +6,7 @@ const AddressService = function () {}
 // generate a P2SH, pay-to-multisig (2-of-2) address
 AddressService.prototype.generateDefaultBlockioAddress = (bip32PrivKey, secondaryPubKey, network, i) => {
   // DOGE addresses are generated only using this function
-  if (!i) {
+  if (network.bech32) {
     i = 0
   }
   const PUB1 = bitcoin.bip32.fromBase58(bip32PrivKey, network).derivePath('m/' + i + '/0').publicKey

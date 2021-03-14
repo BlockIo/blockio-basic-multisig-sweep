@@ -150,89 +150,89 @@ function getNetworkFee (psbt, bech32) {
 
 async function createBalanceMap () {
   const balanceMap = {}
-  while (n) {
-    console.log('Evaluating addresses at i=' + n)
-    const p2wsh_p2sh_addr_payment = AddressService.generateSubsequentBlockioAddress(bip32Priv, pubKey, networkObj, n)
-    const p2wsh_addr_payment = AddressService.generateP2wshBlockioAddress(bip32Priv, pubKey, networkObj, n)
-    const p2wsh_p2sh_addr = p2wsh_p2sh_addr_payment.address
-    const p2wsh_addr = p2wsh_addr_payment.address
-
-    try {
-      const p2wsh_p2sh_addr_utxo = await AddressService.checkBlockioAddressBalance(p2wsh_p2sh_addr, network, BLOCK_CHAIN_API_URL, getUtxoApi)
-      const p2wsh_addr_utxo = await AddressService.checkBlockioAddressBalance(p2wsh_addr, network, BLOCK_CHAIN_API_URL, getUtxoApi)
-
-      balanceMap[p2wsh_p2sh_addr] = {}
-      balanceMap[p2wsh_p2sh_addr].address_type = constants.P2WSH_P2SH
-      balanceMap[p2wsh_p2sh_addr].i = n
-      balanceMap[p2wsh_p2sh_addr].tx = []
-
-      balanceMap[p2wsh_addr] = {}
-      balanceMap[p2wsh_addr].address_type = constants.P2WSH
-      balanceMap[p2wsh_addr].i = n
-      balanceMap[p2wsh_addr].tx = []
-
-      for (const x of p2wsh_p2sh_addr_utxo.data.txs) {
-        const unspentObj = {}
-        unspentObj.hash = x.txid
-        unspentObj.index = x.output_no
-        unspentObj.value = x.value
-        unspentObj.witnessUtxo = {
-          script: Buffer.from(x.script_hex, 'hex'),
-          value: parseFloat(x.value) * constants.SAT
-        }
-        unspentObj.redeemScript = p2wsh_p2sh_addr_payment.redeem.output
-        unspentObj.witnessScript = p2wsh_p2sh_addr_payment.redeem.redeem.output
-
-        balanceMap[p2wsh_p2sh_addr].tx.push(unspentObj)
-      }
-
-      if (!balanceMap[p2wsh_p2sh_addr].tx.length) { delete balanceMap[p2wsh_p2sh_addr] }
-
-      for (const x of p2wsh_addr_utxo.data.txs) {
-        const unspentObj = {}
-        unspentObj.hash = x.txid
-        unspentObj.index = x.output_no
-        unspentObj.value = x.value
-        unspentObj.witnessUtxo = {
-          script: Buffer.from(x.script_hex, 'hex'),
-          value: parseFloat(x.value) * constants.SAT
-        }
-        unspentObj.witnessScript = p2wsh_addr_payment.redeem.output
-
-        balanceMap[p2wsh_addr].tx.push(unspentObj)
-      }
-      if (!balanceMap[p2wsh_addr].tx.length) { delete balanceMap[p2wsh_addr] }
-    } catch (err) {
-      console.log(err)
+  if (network !== 'DOGE' && network !== 'DOGETEST') {
+    while (n) {
+      console.log('Evaluating addresses at i=' + n)
+      await addAddrToMap(balanceMap, constants.P2WSH_P2SH, n)
+      await addAddrToMap(balanceMap, constants.P2WSH, n)
+      n--
     }
-    n--
-  }
-  console.log('Evaluating addresses at i=0')
-  const p2sh_addr_payment = AddressService.generateDefaultBlockioAddress(bip32Priv, pubKey, networkObj)
-  const p2sh_addr = p2sh_addr_payment.address
-
-  balanceMap[p2sh_addr] = {}
-  balanceMap[p2sh_addr].address_type = constants.P2SH
-  balanceMap[p2sh_addr].i = n
-  balanceMap[p2sh_addr].tx = []
-
-  const p2sh_addr_utxo = await AddressService.checkBlockioAddressBalance(p2sh_addr, network, BLOCK_CHAIN_API_URL, getUtxoApi)
-
-  for (const x of p2sh_addr_utxo.data.txs) {
-    const unspentObj = {}
-    unspentObj.hash = x.txid
-    unspentObj.index = x.output_no
-    unspentObj.value = x.value
-    unspentObj.nonWitnessUtxo = Buffer.from(await getTxHex(x.txid, network), 'hex')
-    unspentObj.redeemScript = p2sh_addr_payment.redeem.output
-
-    balanceMap[p2sh_addr].tx.push(unspentObj)
-  }
-  if (!balanceMap[p2sh_addr].tx.length) {
-    delete balanceMap[p2sh_addr]
+    console.log('Evaluating addresses at i=' + n)
+    await addAddrToMap(balanceMap, constants.P2SH, n)
+  } else {
+    while (n) {
+      console.log('Evaluating addresses at i=' + n)
+      await addAddrToMap(balanceMap, constants.P2SH, n)
+      n--
+    }
   }
 
   return balanceMap
+}
+
+async function addAddrToMap (balanceMap, addrType, n) {
+  let payment
+
+  switch (addrType) {
+    case constants.P2WSH_P2SH:
+      payment = AddressService.generateSubsequentBlockioAddress(bip32Priv, pubKey, networkObj, n)
+      balanceMap[payment.address] = {}
+      balanceMap[payment.address].address_type = constants.P2WSH_P2SH
+      break
+    case constants.P2WSH:
+      payment = AddressService.generateP2wshBlockioAddress(bip32Priv, pubKey, networkObj, n)
+      balanceMap[payment.address] = {}
+      balanceMap[payment.address].address_type = constants.P2WSH
+      break
+    case constants.P2SH:
+      payment = AddressService.generateDefaultBlockioAddress(bip32Priv, pubKey, networkObj, n)
+      balanceMap[payment.address] = {}
+      balanceMap[payment.address].address_type = constants.P2SH
+      break
+  }
+
+  try {
+    const addrUtxo = await AddressService.checkBlockioAddressBalance(payment.address, network, BLOCK_CHAIN_API_URL, getUtxoApi)
+
+    balanceMap[payment.address] = {}
+    balanceMap[payment.address].i = n
+    balanceMap[payment.address].tx = []
+
+    let x
+    for (x of addrUtxo.data.txs) {
+      const unspentObj = {}
+      unspentObj.hash = x.txid
+      unspentObj.index = x.output_no
+      unspentObj.value = x.value
+      switch (addrType) {
+        case constants.P2WSH_P2SH:
+          unspentObj.witnessUtxo = {
+            script: Buffer.from(x.script_hex, 'hex'),
+            value: parseFloat(x.value) * constants.SAT
+          }
+          unspentObj.redeemScript = payment.redeem.output
+          unspentObj.witnessScript = payment.redeem.redeem.output
+          break
+        case constants.P2WSH:
+          unspentObj.witnessUtxo = {
+            script: Buffer.from(x.script_hex, 'hex'),
+            value: parseFloat(x.value) * constants.SAT
+          }
+          unspentObj.witnessScript = payment.redeem.output
+          break
+        case constants.P2SH:
+          unspentObj.nonWitnessUtxo = Buffer.from(await getTxHex(x.txid, network), 'hex')
+          unspentObj.redeemScript = payment.redeem.output
+          break
+      }
+      balanceMap[payment.address].tx.push(unspentObj)
+    }
+    if (!balanceMap[payment.address].tx.length) {
+      delete balanceMap[payment.address]
+    }
+  } catch (err) {
+    console.log(err)
+  }
 }
 
 async function getTxHex (txId, network) {
