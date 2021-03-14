@@ -13,9 +13,10 @@ let pubKey
 let privKey
 let TO_ADDR
 let TX_API_URL
-let apiUrl
+let BLOCK_CHAIN_API_URL
 let getUtxoApi
 let sendTxApi
+let getTxApi
 
 require('dotenv').config()
 
@@ -23,9 +24,10 @@ sweepCoins()
 
 function initVars () {
   MAX_TX_LENGTH = 500
-  apiUrl = 'https://sochain.com/api/v2/'
+  BLOCK_CHAIN_API_URL = 'https://sochain.com/api/v2/'
   getUtxoApi = 'get_tx_unspent/'
   sendTxApi = 'send_tx/'
+  getTxApi = 'get_tx/'
 
   // User input Vars
   n = process.env.N
@@ -37,13 +39,13 @@ function initVars () {
   /// ////////////////
 
   pubKey = bitcoin.ECPair.fromWIF(privKey, networkObj).publicKey.toString('hex')
-  TX_API_URL = apiUrl + sendTxApi + network
+  TX_API_URL = BLOCK_CHAIN_API_URL + sendTxApi + network
 }
 
 async function sweepCoins () {
   try {
     initVars()
-    const utxoMap = await createBalanceMap(bip32Priv, pubKey, n, network)
+    const utxoMap = await createBalanceMap(bip32Priv, pubKey, n, networkObj, network)
 
     const txs = []
     const networkFees = []
@@ -146,18 +148,18 @@ function getNetworkFee (psbt, bech32) {
   }
 }
 
-async function createBalanceMap (bip32Priv, pubKey, n, network) {
+async function createBalanceMap () {
   const balanceMap = {}
   while (n) {
     console.log('Evaluating addresses at i=' + n)
-    const p2wsh_p2sh_addr_payment = AddressService.generateSubsequentBlockioAddress(bip32Priv, pubKey, n, network)
-    const p2wsh_addr_payment = AddressService.generateP2wshBlockioAddress(bip32Priv, pubKey, n, network)
+    const p2wsh_p2sh_addr_payment = AddressService.generateSubsequentBlockioAddress(bip32Priv, pubKey, networkObj, n)
+    const p2wsh_addr_payment = AddressService.generateP2wshBlockioAddress(bip32Priv, pubKey, networkObj, n)
     const p2wsh_p2sh_addr = p2wsh_p2sh_addr_payment.address
     const p2wsh_addr = p2wsh_addr_payment.address
 
     try {
-      const p2wsh_p2sh_addr_utxo = await AddressService.checkBlockioAddressBalance(p2wsh_p2sh_addr, network, apiUrl, getUtxoApi)
-      const p2wsh_addr_utxo = await AddressService.checkBlockioAddressBalance(p2wsh_addr, network, getUtxoApi)
+      const p2wsh_p2sh_addr_utxo = await AddressService.checkBlockioAddressBalance(p2wsh_p2sh_addr, network, BLOCK_CHAIN_API_URL, getUtxoApi)
+      const p2wsh_addr_utxo = await AddressService.checkBlockioAddressBalance(p2wsh_addr, network, BLOCK_CHAIN_API_URL, getUtxoApi)
 
       balanceMap[p2wsh_p2sh_addr] = {}
       balanceMap[p2wsh_p2sh_addr].address_type = constants.P2WSH_P2SH
@@ -206,7 +208,7 @@ async function createBalanceMap (bip32Priv, pubKey, n, network) {
     n--
   }
   console.log('Evaluating addresses at i=0')
-  const p2sh_addr_payment = AddressService.generateDefaultBlockioAddress(bip32Priv, pubKey, network)
+  const p2sh_addr_payment = AddressService.generateDefaultBlockioAddress(bip32Priv, pubKey, networkObj)
   const p2sh_addr = p2sh_addr_payment.address
 
   balanceMap[p2sh_addr] = {}
@@ -214,14 +216,14 @@ async function createBalanceMap (bip32Priv, pubKey, n, network) {
   balanceMap[p2sh_addr].i = n
   balanceMap[p2sh_addr].tx = []
 
-  const p2sh_addr_utxo = await AddressService.checkBlockioAddressBalance(p2sh_addr, network, apiUrl, getUtxoApi)
+  const p2sh_addr_utxo = await AddressService.checkBlockioAddressBalance(p2sh_addr, network, BLOCK_CHAIN_API_URL, getUtxoApi)
 
   for (const x of p2sh_addr_utxo.data.txs) {
     const unspentObj = {}
     unspentObj.hash = x.txid
     unspentObj.index = x.output_no
     unspentObj.value = x.value
-    unspentObj.nonWitnessUtxo = Buffer.from(await getSochainTxHex(x.txid, networks.BITCOIN_TEST), 'hex')
+    unspentObj.nonWitnessUtxo = Buffer.from(await getTxHex(x.txid, network), 'hex')
     unspentObj.redeemScript = p2sh_addr_payment.redeem.output
 
     balanceMap[p2sh_addr].tx.push(unspentObj)
@@ -233,9 +235,9 @@ async function createBalanceMap (bip32Priv, pubKey, n, network) {
   return balanceMap
 }
 
-async function getSochainTxHex (txId, network) {
+async function getTxHex (txId, network) {
   try {
-    const apiUrl = 'https://sochain.com/api/v2/get_tx/' + network + '/' + txId
+    const apiUrl = BLOCK_CHAIN_API_URL + getTxApi + network + '/' + txId
     const res = await fetch(apiUrl)
     const json = await res.json()
 
