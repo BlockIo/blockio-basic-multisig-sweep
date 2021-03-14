@@ -3,36 +3,53 @@ const networks = require('./networks')
 const AddressService = require('./services/AddressService')
 const fetch = require('node-fetch')
 const bitcoin = require('bitcoinjs-lib')
-const coininfo = require('coininfo')
+
+let MAX_TX_LENGTH
+let n
+let networkObj
+let network
+let bip32Priv
+let pubKey
+let privKey
+let TO_ADDR
+let TX_API_URL
+let apiUrl
+let getUtxoApi
+let sendTxApi
 
 require('dotenv').config()
 
 sweepCoins()
 
+function initVars () {
+  MAX_TX_LENGTH = 500
+  apiUrl = 'https://sochain.com/api/v2/'
+  getUtxoApi = 'get_tx_unspent/'
+  sendTxApi = 'send_tx/'
+
+  // User input Vars
+  n = process.env.N
+  network = process.env.NETWORK
+  networkObj = networks[network]
+  bip32Priv = process.env.PRIVATE_KEY1_BIP32
+  privKey = process.env.PRIVATE_KEY2
+  TO_ADDR = process.env.DESTINATION_ADDR
+  /// ////////////////
+
+  pubKey = bitcoin.ECPair.fromWIF(privKey, networkObj).publicKey.toString('hex')
+  TX_API_URL = apiUrl + sendTxApi + network
+}
+
 async function sweepCoins () {
   try {
-    ///    Initialize vars start
-
-    const MAX_TX_LENGTH = 500
-    const n = 13
-    const network = networks.BITCOIN_TEST
-    const crypto = 'bitcoin'
-    const isTestnet = true
-    const btcBip32Priv = process.env.BTC_BIP32_PRIV
-    const btcSecondaryPubKey = process.env.BTC_SECONDARY_PUB_KEY
-    const btcSecondaryPrivKey = process.env.BTC_SECONDARY_PRIV_KEY
-    const TO_ADDR = '2NCUkmRWQzy82bwRTyDuWDyQ2zhWUVFBCZM'
-    const TX_API_URL = 'https://sochain.com/api/v2/send_tx/BTCTEST'
-
-    ///    Initialize vars end
-
-    const utxoMap = await createBtcBalanceMap(btcBip32Priv, btcSecondaryPubKey, n, network)
+    initVars()
+    const utxoMap = await createBalanceMap(bip32Priv, pubKey, n, network)
 
     const txs = []
     const networkFees = []
-    let psbt = new bitcoin.Psbt({ network: generateNetwork(crypto, isTestnet) })
+    let psbt = new bitcoin.Psbt({ network: networkObj })
 
-    const hdRoot = bitcoin.bip32.fromBase58(btcBip32Priv, generateNetwork(crypto, isTestnet))
+    const hdRoot = bitcoin.bip32.fromBase58(bip32Priv, networkObj)
     const masterFingerprint = hdRoot.fingerprint
 
     let balToSweep = 0
@@ -66,15 +83,15 @@ async function sweepCoins () {
         psbt.updateInput(inputNum++, updateData)
         if (psbt.txInputs.length === MAX_TX_LENGTH || (addrIte === addressCount && i === addrTxCount)) {
           const tempPsbt = psbt.clone()
-          createAndFinalizeTx(tempPsbt, TO_ADDR, balToSweep, 0, hdRoot, btcSecondaryPrivKey, 'bitcoin', true)
-          const networkFee = getNetworkFee(tempPsbt, 'bitcoin')
-          createAndFinalizeTx(psbt, TO_ADDR, balToSweep, networkFee, hdRoot, btcSecondaryPrivKey, 'bitcoin', true)
+          createAndFinalizeTx(tempPsbt, TO_ADDR, balToSweep, 0, hdRoot, privKey, networkObj)
+          const networkFee = getNetworkFee(tempPsbt, networkObj.bech32)
+          createAndFinalizeTx(psbt, TO_ADDR, balToSweep, networkFee, hdRoot, privKey, networkObj)
           const tx = psbt.extractTransaction()
           const signedTransaction = tx.toHex()
           txs.push(signedTransaction)
           networkFees.push(networkFee)
 
-          psbt = new bitcoin.Psbt({ network: generateNetwork(crypto, isTestnet) })
+          psbt = new bitcoin.Psbt({ network: networkObj })
           inputNum = 0
           balToSweep = 0
         }
@@ -90,14 +107,14 @@ async function sweepCoins () {
   }
 }
 
-function createAndFinalizeTx (psbt, toAddr, balance, networkFee, root, secondaryPrivKey, crypto, isTestnet) {
+function createAndFinalizeTx (psbt, toAddr, balance, networkFee, root, privKey, network) {
   psbt.addOutput({
     address: toAddr, // destination address
     value: Math.floor((balance * constants.SAT) - networkFee)// value in satoshi
   })
   for (let i = 0; i < psbt.txInputs.length; i++) {
     psbt.signInputHD(i, root)
-    psbt.signInput(i, bitcoin.ECPair.fromWIF(secondaryPrivKey, generateNetwork(crypto, isTestnet)))
+    psbt.signInput(i, bitcoin.ECPair.fromWIF(privKey, network))
   }
   psbt.finalizeAllInputs()
 }
@@ -118,39 +135,39 @@ async function sendTx (apiUrl, txHex) {
   }
 }
 
-function getNetworkFee (psbt, crypto) {
+function getNetworkFee (psbt, bech32) {
   const tx = psbt.extractTransaction()
   const vSize = tx.virtualSize()
 
-  if (crypto === 'bitcoin' || crypto === 'litecoin') {
+  if (bech32) {
     return constants.FEE_RATE * vSize
   } else {
     return Math.ceil(vSize / 1000)
   }
 }
 
-async function createBtcBalanceMap (btcBip32Priv, btcSecondaryPubKey, n, network) {
-  const btcBalanceMap = {}
+async function createBalanceMap (bip32Priv, pubKey, n, network) {
+  const balanceMap = {}
   while (n) {
     console.log('Evaluating addresses at i=' + n)
-    const p2wsh_p2sh_addr_payment = AddressService.generateSubsequentBlockioAddress(btcBip32Priv, btcSecondaryPubKey, n, network)
-    const p2wsh_addr_payment = AddressService.generateP2wshBlockioAddress(btcBip32Priv, btcSecondaryPubKey, n, network)
+    const p2wsh_p2sh_addr_payment = AddressService.generateSubsequentBlockioAddress(bip32Priv, pubKey, n, network)
+    const p2wsh_addr_payment = AddressService.generateP2wshBlockioAddress(bip32Priv, pubKey, n, network)
     const p2wsh_p2sh_addr = p2wsh_p2sh_addr_payment.address
     const p2wsh_addr = p2wsh_addr_payment.address
 
     try {
-      const p2wsh_p2sh_addr_utxo = await AddressService.checkBlockioAddressBalance(p2wsh_p2sh_addr, network)
-      const p2wsh_addr_utxo = await AddressService.checkBlockioAddressBalance(p2wsh_addr, network)
+      const p2wsh_p2sh_addr_utxo = await AddressService.checkBlockioAddressBalance(p2wsh_p2sh_addr, network, apiUrl, getUtxoApi)
+      const p2wsh_addr_utxo = await AddressService.checkBlockioAddressBalance(p2wsh_addr, network, getUtxoApi)
 
-      btcBalanceMap[p2wsh_p2sh_addr] = {}
-      btcBalanceMap[p2wsh_p2sh_addr].address_type = constants.P2WSH_P2SH
-      btcBalanceMap[p2wsh_p2sh_addr].i = n
-      btcBalanceMap[p2wsh_p2sh_addr].tx = []
+      balanceMap[p2wsh_p2sh_addr] = {}
+      balanceMap[p2wsh_p2sh_addr].address_type = constants.P2WSH_P2SH
+      balanceMap[p2wsh_p2sh_addr].i = n
+      balanceMap[p2wsh_p2sh_addr].tx = []
 
-      btcBalanceMap[p2wsh_addr] = {}
-      btcBalanceMap[p2wsh_addr].address_type = constants.P2WSH
-      btcBalanceMap[p2wsh_addr].i = n
-      btcBalanceMap[p2wsh_addr].tx = []
+      balanceMap[p2wsh_addr] = {}
+      balanceMap[p2wsh_addr].address_type = constants.P2WSH
+      balanceMap[p2wsh_addr].i = n
+      balanceMap[p2wsh_addr].tx = []
 
       for (const x of p2wsh_p2sh_addr_utxo.data.txs) {
         const unspentObj = {}
@@ -164,10 +181,10 @@ async function createBtcBalanceMap (btcBip32Priv, btcSecondaryPubKey, n, network
         unspentObj.redeemScript = p2wsh_p2sh_addr_payment.redeem.output
         unspentObj.witnessScript = p2wsh_p2sh_addr_payment.redeem.redeem.output
 
-        btcBalanceMap[p2wsh_p2sh_addr].tx.push(unspentObj)
+        balanceMap[p2wsh_p2sh_addr].tx.push(unspentObj)
       }
 
-      if (!btcBalanceMap[p2wsh_p2sh_addr].tx.length) { delete btcBalanceMap[p2wsh_p2sh_addr] }
+      if (!balanceMap[p2wsh_p2sh_addr].tx.length) { delete balanceMap[p2wsh_p2sh_addr] }
 
       for (const x of p2wsh_addr_utxo.data.txs) {
         const unspentObj = {}
@@ -180,24 +197,24 @@ async function createBtcBalanceMap (btcBip32Priv, btcSecondaryPubKey, n, network
         }
         unspentObj.witnessScript = p2wsh_addr_payment.redeem.output
 
-        btcBalanceMap[p2wsh_addr].tx.push(unspentObj)
+        balanceMap[p2wsh_addr].tx.push(unspentObj)
       }
-      if (!btcBalanceMap[p2wsh_addr].tx.length) { delete btcBalanceMap[p2wsh_addr] }
+      if (!balanceMap[p2wsh_addr].tx.length) { delete balanceMap[p2wsh_addr] }
     } catch (err) {
       console.log(err)
     }
     n--
   }
   console.log('Evaluating addresses at i=0')
-  const p2sh_addr_payment = AddressService.generateDefaultBlockioAddress(btcBip32Priv, btcSecondaryPubKey, network)
+  const p2sh_addr_payment = AddressService.generateDefaultBlockioAddress(bip32Priv, pubKey, network)
   const p2sh_addr = p2sh_addr_payment.address
 
-  btcBalanceMap[p2sh_addr] = {}
-  btcBalanceMap[p2sh_addr].address_type = constants.P2SH
-  btcBalanceMap[p2sh_addr].i = n
-  btcBalanceMap[p2sh_addr].tx = []
+  balanceMap[p2sh_addr] = {}
+  balanceMap[p2sh_addr].address_type = constants.P2SH
+  balanceMap[p2sh_addr].i = n
+  balanceMap[p2sh_addr].tx = []
 
-  const p2sh_addr_utxo = await AddressService.checkBlockioAddressBalance(p2sh_addr, network)
+  const p2sh_addr_utxo = await AddressService.checkBlockioAddressBalance(p2sh_addr, network, apiUrl, getUtxoApi)
 
   for (const x of p2sh_addr_utxo.data.txs) {
     const unspentObj = {}
@@ -207,13 +224,13 @@ async function createBtcBalanceMap (btcBip32Priv, btcSecondaryPubKey, n, network
     unspentObj.nonWitnessUtxo = Buffer.from(await getSochainTxHex(x.txid, networks.BITCOIN_TEST), 'hex')
     unspentObj.redeemScript = p2sh_addr_payment.redeem.output
 
-    btcBalanceMap[p2sh_addr].tx.push(unspentObj)
+    balanceMap[p2sh_addr].tx.push(unspentObj)
   }
-  if (!btcBalanceMap[p2sh_addr].tx.length) {
-    delete btcBalanceMap[p2sh_addr]
+  if (!balanceMap[p2sh_addr].tx.length) {
+    delete balanceMap[p2sh_addr]
   }
 
-  return btcBalanceMap
+  return balanceMap
 }
 
 async function getSochainTxHex (txId, network) {
@@ -226,23 +243,4 @@ async function getSochainTxHex (txId, network) {
   } catch (err) {
     return err.response.body
   }
-}
-
-function generateNetwork (crypto, isTestnet) {
-  const net = isTestnet ? 'test' : 'main'
-  const curr = coininfo[crypto][net]
-  const frmt = curr.toBitcoinJS()
-
-  const netGain = {
-    messagePrefix: '\x19' + frmt.name + ' Signed Message:\n',
-    bip32: {
-      public: frmt.bip32.public,
-      private: frmt.bip32.private
-    },
-    bech32: frmt.bech32,
-    pubKeyHash: frmt.pubKeyHash,
-    scriptHash: frmt.scriptHash,
-    wif: frmt.wif
-  }
-  return netGain
 }
