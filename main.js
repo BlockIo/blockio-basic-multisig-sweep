@@ -13,7 +13,7 @@ async function sweepCoins () {
   try {
     ///    Initialize vars start
 
-    const MAX_TX_LENGTH = 3
+    const MAX_TX_LENGTH = 500
     const n = 13
     const network = networks.BITCOIN_TEST
     const crypto = 'bitcoin'
@@ -28,7 +28,8 @@ async function sweepCoins () {
 
     const utxoMap = await createBtcBalanceMap(btcBip32Priv, btcSecondaryPubKey, n, network)
 
-    const psbtArr = []
+    const txs = []
+    const networkFees = []
     let psbt = new bitcoin.Psbt({ network: generateNetwork(crypto, isTestnet) })
 
     const hdRoot = bitcoin.bip32.fromBase58(btcBip32Priv, generateNetwork(crypto, isTestnet))
@@ -36,6 +37,9 @@ async function sweepCoins () {
 
     let balToSweep = 0
     let inputNum = 0
+    const addressCount = Object.keys(utxoMap).length - 1
+    let addrIte = 0
+
     for (const address of Object.keys(utxoMap)) {
       const path = 'm/' + utxoMap[address].i + '/0' // default path
       const childNode = hdRoot.derivePath(path)
@@ -50,7 +54,9 @@ async function sweepCoins () {
           }
         ]
       }
-      for (const utxo of utxoMap[address].tx) {
+      const addrTxCount = utxoMap[address].tx.length - 1
+      for (let i = 0; i < utxoMap[address].tx.length; i++) {
+        const utxo = utxoMap[address].tx[i]
         balToSweep += parseFloat(utxo.value)
         delete utxo.value
         const input = {
@@ -58,39 +64,42 @@ async function sweepCoins () {
         }
         psbt.addInput(input)
         psbt.updateInput(inputNum++, updateData)
-        if (psbt.txInputs.length === MAX_TX_LENGTH) {
-          psbt.addOutput({
-            address: TO_ADDR, // destination address
-            value: Math.floor((balToSweep * constants.SAT) - constants.BITCOIN_FEE)// value in satoshi
-          })
-          psbtArr.push(psbt)
+        if (psbt.txInputs.length === MAX_TX_LENGTH || (addrIte === addressCount && i === addrTxCount)) {
+          const tempPsbt = psbt.clone()
+          createAndFinalizeTx(tempPsbt, TO_ADDR, balToSweep, 0, hdRoot, btcSecondaryPrivKey, 'bitcoin', true)
+          const networkFee = getNetworkFee(tempPsbt, 'bitcoin')
+          createAndFinalizeTx(psbt, TO_ADDR, balToSweep, networkFee, hdRoot, btcSecondaryPrivKey, 'bitcoin', true)
+          const tx = psbt.extractTransaction()
+          const signedTransaction = tx.toHex()
+          txs.push(signedTransaction)
+          networkFees.push(networkFee)
+
           psbt = new bitcoin.Psbt({ network: generateNetwork(crypto, isTestnet) })
           inputNum = 0
           balToSweep = 0
         }
       }
+      addrIte++
     }
-    if (!psbtArr.length) {
-      psbt.addOutput({
-        address: TO_ADDR, // destination address
-        value: Math.floor((balToSweep * constants.SAT) - constants.BITCOIN_FEE)// value in satoshi
-      })
-      psbtArr.push(psbt)
-    }
-    for (const psbt of psbtArr) {
-      for (let i = 0; i < psbt.txInputs.length; i++) {
-        psbt.signInputHD(i, hdRoot)
-        psbt.signInput(i, bitcoin.ECPair.fromWIF(btcSecondaryPrivKey, generateNetwork(crypto, isTestnet)))
-      }
-      psbt.finalizeAllInputs()
-      const tx = psbt.extractTransaction()
-      // console.log('transaction size:', tx.virtualSize())
-      const signedTransaction = tx.toHex()
-      await sendTx(TX_API_URL, signedTransaction)
+    for (const tx in txs) {
+      await sendTx(TX_API_URL, txs[tx])
+      console.log('Network fee:', networkFees[tx])
     }
   } catch (err) {
     console.log(err)
   }
+}
+
+function createAndFinalizeTx (psbt, toAddr, balance, networkFee, root, secondaryPrivKey, crypto, isTestnet) {
+  psbt.addOutput({
+    address: toAddr, // destination address
+    value: Math.floor((balance * constants.SAT) - networkFee)// value in satoshi
+  })
+  for (let i = 0; i < psbt.txInputs.length; i++) {
+    psbt.signInputHD(i, root)
+    psbt.signInput(i, bitcoin.ECPair.fromWIF(secondaryPrivKey, generateNetwork(crypto, isTestnet)))
+  }
+  psbt.finalizeAllInputs()
 }
 
 async function sendTx (apiUrl, txHex) {
@@ -106,6 +115,17 @@ async function sendTx (apiUrl, txHex) {
   } else {
     console.log('Sweep Failed:')
     console.log(res)
+  }
+}
+
+function getNetworkFee (psbt, crypto) {
+  const tx = psbt.extractTransaction()
+  const vSize = tx.virtualSize()
+
+  if (crypto === 'bitcoin' || crypto === 'litecoin') {
+    return constants.FEE_RATE * vSize
+  } else {
+    return Math.ceil(vSize / 1000)
   }
 }
 

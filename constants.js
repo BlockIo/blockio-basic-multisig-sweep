@@ -3,5 +3,5 @@ module.exports = {
   P2SH: 'p2sh',
   P2WSH: 'p2wsh',
   SAT: 100000000,
-  BITCOIN_FEE: 10000
+  FEE_RATE: 20
 }
