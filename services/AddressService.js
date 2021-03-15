@@ -66,15 +66,14 @@ AddressService.prototype.generateP2wshBlockioAddress = (bip32PrivKey, secondaryP
   return output
 }
 
-AddressService.prototype.checkBlockioAddressBalance = async (addr, network, url, api) => {
+AddressService.prototype.checkBlockioAddressBalance = async (apiUrl) => {
   try {
-    const apiUrl = url + api + network + '/' + addr
     const res = await fetch(apiUrl)
     const json = await res.json()
 
     return json
   } catch (err) {
-    return err.response.body
+    throw new Error(err.response.body)
   }
 }
 
