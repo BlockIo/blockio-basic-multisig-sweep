@@ -17,12 +17,12 @@ function BlockIoSweep (network, bip32_private_key_1, private_key_2, destination_
     this.provider = options.provider || BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER
     this.providerUrl = options.providerUrl || BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER_API_URL
     this.feeRate = options.feeRate || BlockIoSweep.DEFAULT_FEE_RATE
-    this.maxTxLength = options.maxTxLength || BlockIoSweep.DEFAULT_MAX_TX_LENGTH
+    this.maxTxInputs = options.maxTxInputs || BlockIoSweep.DEFAULT_MAX_TX_INPUTS
   } else {
     this.provider = BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER
     this.providerUrl = BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER_API_URL
     this.feeRate = BlockIoSweep.DEFAULT_FEE_RATE
-    this.maxTxLength = BlockIoSweep.DEFAULT_MAX_TX_LENGTH
+    this.maxTxInputs = BlockIoSweep.DEFAULT_MAX_TX_INPUTS
   }
 }
 
@@ -30,7 +30,7 @@ BlockIoSweep.DEFAULT_N = constants.N
 BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER = constants.BLOCKCHAIN_PROVIDER_DEFAULT
 BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER_API_URL = constants.BLOCKCHAIN_PROVIDER_URL_DEFAULT
 BlockIoSweep.DEFAULT_FEE_RATE = constants.FEE_RATE
-BlockIoSweep.DEFAULT_MAX_TX_LENGTH = constants.MAX_TX_LENGTH
+BlockIoSweep.DEFAULT_MAX_TX_INPUTS = constants.MAX_TX_INPUTS
 
 BlockIoSweep.prototype.begin = async function () {
   if (this.network !== constants.NETWORKS.BTC && this.network !== constants.NETWORKS.BTCTEST &&
@@ -94,7 +94,27 @@ BlockIoSweep.prototype.begin = async function () {
         }
         psbt.addInput(input)
         psbt.updateInput(inputNum++, updateData)
-        if (psbt.txInputs.length === this.maxTxLength || (addrIte === addressCount && i === addrTxCount)) {
+        if (psbt.txInputs.length === this.maxTxInputs || (addrIte === addressCount && i === addrTxCount)) {
+          const balance = Math.floor(balToSweep * constants.SAT)
+          let allowTx = true
+          if (this.network === constants.NETWORKS.BTC || this.network === constants.NETWORKS.BTCTEST) {
+            if (balance <= constants.DUST.BTC) {
+              allowTx = false
+            }
+          } else if (this.network === constants.NETWORKS.LTC || this.network === constants.NETWORKS.LTCTEST) {
+            if (balance <= constants.DUST.LTC) {
+              allowTx = false
+            }
+          } else {
+            if (balToSweep <= constants.DUST.DOGE) {
+              allowTx = false
+            }
+          }
+
+          if (!allowTx) {
+            throw new Error('Amount less than dust being sent, tx aborted')
+          }
+
           const tempPsbt = psbt.clone()
           createAndFinalizeTx(tempPsbt, this.toAddr, balToSweep, 0, hdRoot, this.privateKey2, this.networkObj)
           const networkFee = getNetworkFee(tempPsbt, this.networkObj.bech32, this.feeRate)
@@ -111,6 +131,9 @@ BlockIoSweep.prototype.begin = async function () {
         }
       }
       addrIte++
+    }
+    if (!txs.length) {
+      throw new Error('No transaction created, do your addresses have balance?')
     }
     for (const tx in txs) {
       console.log('TX Hex:', txs[tx])
@@ -236,7 +259,7 @@ async function addAddrToMap (balanceMap, addrType, n, bip32Priv, pubKey, network
         case constants.P2WSH_P2SH:
           unspentObj.witnessUtxo = {
             script: Buffer.from(x.script_hex, 'hex'),
-            value: parseFloat(x.value) * constants.SAT
+            value: Math.ceil(parseFloat(x.value) * constants.SAT)
           }
           unspentObj.redeemScript = payment.redeem.output
           unspentObj.witnessScript = payment.redeem.redeem.output
@@ -244,7 +267,7 @@ async function addAddrToMap (balanceMap, addrType, n, bip32Priv, pubKey, network
         case constants.P2WSH:
           unspentObj.witnessUtxo = {
             script: Buffer.from(x.script_hex, 'hex'),
-            value: parseFloat(x.value) * constants.SAT
+            value: Math.ceil(parseFloat(x.value) * constants.SAT)
           }
           unspentObj.witnessScript = payment.redeem.output
           break

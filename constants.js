@@ -5,7 +5,7 @@ module.exports = {
   SAT: 100000000,
   FEE_RATE: 20,
   N: 100,
-  MAX_TX_LENGTH: 500,
+  MAX_TX_INPUTS: 500,
   BLOCKCHAIN_PROVIDER_DEFAULT: 'sochain',
   BLOCKCHAIN_PROVIDER_URL_DEFAULT: 'https://sochain.com/api/v2/',
   NETWORKS: {
@@ -15,5 +15,10 @@ module.exports = {
     LTCTEST: 'LTCTEST',
     DOGE: 'DOGE',
     DOGETEST: 'DOGETEST'
+  },
+  DUST: {
+    BTC: 546,
+    LTC: 1000,
+    DOGE: 1
   }
 }
