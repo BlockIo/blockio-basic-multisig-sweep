@@ -88,7 +88,8 @@ async function sweepCoins () {
           createAndFinalizeTx(tempPsbt, TO_ADDR, balToSweep, 0, hdRoot, privKey, networkObj)
           const networkFee = getNetworkFee(tempPsbt, networkObj.bech32)
           createAndFinalizeTx(psbt, TO_ADDR, balToSweep, networkFee, hdRoot, privKey, networkObj)
-          const tx = psbt.extractTransaction()
+          // disable fee check for doge
+          const tx = networkObj.bech32 ? psbt.extractTransaction() : psbt.extractTransaction(true)
           const signedTransaction = tx.toHex()
           txs.push(signedTransaction)
           networkFees.push(networkFee)
@@ -110,9 +111,11 @@ async function sweepCoins () {
 }
 
 function createAndFinalizeTx (psbt, toAddr, balance, networkFee, root, privKey, network) {
+  // for DOGE, network fee is in DOGE
+  const val = network.bech32 ? Math.floor((balance * constants.SAT) - networkFee) : Math.floor((balance - networkFee) * constants.SAT)
   psbt.addOutput({
     address: toAddr, // destination address
-    value: Math.floor((balance * constants.SAT) - networkFee)// value in satoshi
+    value: val// value in satoshi
   })
   for (let i = 0; i < psbt.txInputs.length; i++) {
     psbt.signInputHD(i, root)
@@ -153,16 +156,16 @@ async function createBalanceMap () {
   if (network !== 'DOGE' && network !== 'DOGETEST') {
     while (n) {
       console.log('Evaluating addresses at i=' + n)
-      await addAddrToMap(balanceMap, constants.P2WSH_P2SH, n)
-      await addAddrToMap(balanceMap, constants.P2WSH, n)
+      await addAddrToMap(balanceMap, constants.P2WSH_P2SH, parseInt(n))
+      await addAddrToMap(balanceMap, constants.P2WSH, parseInt(n))
       n--
     }
     console.log('Evaluating addresses at i=' + n)
-    await addAddrToMap(balanceMap, constants.P2SH, n)
+    await addAddrToMap(balanceMap, constants.P2SH, parseInt(n))
   } else {
-    while (n) {
+    while (n >= 0) {
       console.log('Evaluating addresses at i=' + n)
-      await addAddrToMap(balanceMap, constants.P2SH, n)
+      await addAddrToMap(balanceMap, constants.P2SH, parseInt(n))
       n--
     }
   }
@@ -194,7 +197,6 @@ async function addAddrToMap (balanceMap, addrType, n) {
   try {
     const addrUtxo = await AddressService.checkBlockioAddressBalance(payment.address, network, BLOCK_CHAIN_API_URL, getUtxoApi)
 
-    balanceMap[payment.address] = {}
     balanceMap[payment.address].i = n
     balanceMap[payment.address].tx = []
 
