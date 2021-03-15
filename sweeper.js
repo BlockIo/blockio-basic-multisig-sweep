@@ -1,3 +1,4 @@
+const readline = require('readline')
 const constants = require('./constants')
 const networks = require('./networks')
 const AddressService = require('./services/AddressService')
@@ -112,6 +113,12 @@ BlockIoSweep.prototype.begin = async function () {
       addrIte++
     }
     for (const tx in txs) {
+      console.log('TX Hex:', txs[tx])
+      const ans = await promptConfirmation('Type y to broadcast tx, otherwise, press anything else: ')
+      if (ans !== 'y') {
+        console.log('Tx aborted')
+        continue
+      }
       await sendTx(sendTxApiUrl, txs[tx])
       console.log('Network fee:', networkFees[tx])
     }
@@ -146,7 +153,7 @@ async function sendTx (apiUrl, txHex) {
     res = await res.json()
     if (res.status === 'success') {
       console.log('Sweep Success!')
-      console.log(res.data.txid)
+      console.log('Tx_id:', res.data.txid)
     } else {
       console.log('Sweep Failed:')
       throw new Error(res)
@@ -265,4 +272,16 @@ async function getTxHex (apiUrl) {
   } catch (err) {
     throw new Error(err.response.body)
   }
+}
+
+function promptConfirmation (query) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  })
+
+  return new Promise(resolve => rl.question(query, ans => {
+    rl.close()
+    resolve(ans)
+  }))
 }
