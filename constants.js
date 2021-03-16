@@ -1,7 +1,7 @@
 module.exports = {
-  P2WSH_P2SH: 'p2wsh_p2sh',
-  P2SH: 'p2sh',
-  P2WSH: 'p2wsh',
+  P2WSH_P2SH: 'P2WSH-P2SH',
+  P2SH: 'P2SH',
+  P2WSH: 'WITNESS_V0',
   SAT: 100000000,
   FEE_RATE: 20,
   N: 100,

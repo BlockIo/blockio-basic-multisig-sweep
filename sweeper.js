@@ -213,26 +213,10 @@ async function createBalanceMap (n, bip32Priv, pubKey, networkObj, network, deri
 async function addAddrToMap (balanceMap, addrType, i, bip32Priv, pubKey, networkObj, derivationPath, utxoApiUrl, getTxApiUrl) {
     let payment
     const derivPath = derivationPath.replace("i",i.toString())
-    switch (addrType) {
-    case constants.P2WSH_P2SH:
-	payment = AddressService.generateP2WSHOverP2SHAddress(bip32Priv, pubKey, networkObj, derivPath)
-	console.log(payment.address);
-	balanceMap[payment.address] = {}
-	balanceMap[payment.address].address_type = constants.P2WSH_P2SH
-	break
-    case constants.P2WSH:
-	payment = AddressService.generateWitnessV0Address(bip32Priv, pubKey, networkObj, derivPath)
-	console.log(payment.address);
-	balanceMap[payment.address] = {}
-	balanceMap[payment.address].address_type = constants.P2WSH
-	break
-    case constants.P2SH:
-	payment = AddressService.generateP2SHAddress(bip32Priv, pubKey, networkObj, derivPath)
-	console.log(payment.address);
-	balanceMap[payment.address] = {}
-	balanceMap[payment.address].address_type = constants.P2SH
-	break
-    }
+    payment = AddressService.generateAddress(addrType, bip32Priv, pubKey, networkObj, derivPath)
+    console.log("type=" + addrType + " address=" + payment.address)
+    balanceMap[payment.address] = {}
+    balanceMap[payment.address].address_type = addrType
     
     const addrUtxo = await AddressService.checkBlockioAddressBalance(utxoApiUrl + payment.address)
     
