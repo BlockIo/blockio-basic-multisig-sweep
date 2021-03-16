@@ -24,6 +24,12 @@ function BlockIoSweep (network, bip32_private_key_1, private_key_2, destination_
     this.feeRate = BlockIoSweep.DEFAULT_FEE_RATE
     this.maxTxInputs = BlockIoSweep.DEFAULT_MAX_TX_INPUTS
   }
+
+  if (this.provider === BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER) {
+    this.sendTxApiUrl = this.providerUrl + 'send_tx/' + this.network
+    this.getUtxoApiUrl = this.providerUrl + 'get_tx_unspent/' + this.network + '/'
+    this.getTxApiUrl = this.providerUrl + 'get_tx/' + this.network + '/'
+  }
 }
 
 BlockIoSweep.DEFAULT_N = constants.N
@@ -45,18 +51,9 @@ BlockIoSweep.prototype.begin = async function () {
     throw new Error('Destination address not provided')
   }
   const publicKey2 = bitcoin.ECPair.fromWIF(this.privateKey2, this.networkObj).publicKey.toString('hex')
-  let getUtxoApiUrl
-  let sendTxApiUrl
-  let getTxApiUrl
-
-  if (this.provider === BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER) {
-    sendTxApiUrl = this.providerUrl + 'send_tx/' + this.network
-    getUtxoApiUrl = this.providerUrl + 'get_tx_unspent/' + this.network + '/'
-    getTxApiUrl = this.providerUrl + 'get_tx/' + this.network + '/'
-  }
 
   try {
-    const utxoMap = await createBalanceMap(this.n, this.bip32PrivKey, publicKey2, this.networkObj, this.network, getUtxoApiUrl, getTxApiUrl)
+    const utxoMap = await createBalanceMap(this.n, this.bip32PrivKey, publicKey2, this.networkObj, this.network, this.getUtxoApiUrl, this.getTxApiUrl)
 
     const txs = []
     const networkFees = []
@@ -142,7 +139,7 @@ BlockIoSweep.prototype.begin = async function () {
         console.log('Tx aborted')
         continue
       }
-      await sendTx(sendTxApiUrl, txs[tx])
+      await sendTx(this.sendTxApiUrl, txs[tx])
       console.log('Network fee:', networkFees[tx])
     }
   } catch (err) {
