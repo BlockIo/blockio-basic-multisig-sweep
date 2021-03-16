@@ -4,9 +4,9 @@ const fetch = require('node-fetch')
 const AddressService = function () {}
 
 // generate a P2SH, pay-to-multisig (2-of-2) address
-AddressService.prototype.generateP2SHAddress = (bip32PrivKey, secondaryPubKey, network, i) => {
+AddressService.prototype.generateP2SHAddress = (bip32PrivKey, secondaryPubKey, network, derivationPath) => {
   // DOGE addresses are generated only using this function
-  const PUB1 = bitcoin.bip32.fromBase58(bip32PrivKey, network).derivePath('m/' + i + '/0').publicKey
+  const PUB1 = bitcoin.bip32.fromBase58(bip32PrivKey, network).derivePath(derivationPath).publicKey
   const PUB2 = Buffer.from(secondaryPubKey, 'hex')
   const pubkeys = [PUB1, PUB2]
 
@@ -28,8 +28,8 @@ AddressService.prototype.generateP2SHAddress = (bip32PrivKey, secondaryPubKey, n
 }
 
 // generate a P2SH(P2WSH(...)), pay-to-multisig (2-of-2) address
-AddressService.prototype.generateP2WSHOverP2SHAddress = (bip32PrivKey, secondaryPubKey, network, i) => {
-  const PUB1 = bitcoin.bip32.fromBase58(bip32PrivKey, network).derivePath('m/' + i + '/0').publicKey
+AddressService.prototype.generateP2WSHOverP2SHAddress = (bip32PrivKey, secondaryPubKey, network, derivationPath) => {
+  const PUB1 = bitcoin.bip32.fromBase58(bip32PrivKey, network).derivePath(derivationPath).publicKey
   const PUB2 = Buffer.from(secondaryPubKey, 'hex')
   const pubkeys = [PUB1, PUB2]
 
@@ -52,8 +52,8 @@ AddressService.prototype.generateP2WSHOverP2SHAddress = (bip32PrivKey, secondary
 }
 
 // generate a P2WSH (SegWit), pay-to-multisig (2-of-2) address
-AddressService.prototype.generateWitnessV0Address = (bip32PrivKey, secondaryPubKey, network, i) => {
-  const PUB1 = bitcoin.bip32.fromBase58(bip32PrivKey, network).derivePath('m/' + i + '/0').publicKey
+AddressService.prototype.generateWitnessV0Address = (bip32PrivKey, secondaryPubKey, network, derivationPath) => {
+  const PUB1 = bitcoin.bip32.fromBase58(bip32PrivKey, network).derivePath(derivationPath).publicKey
   const PUB2 = Buffer.from(secondaryPubKey, 'hex')
 
   const pubkeys = [PUB1, PUB2]

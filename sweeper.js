@@ -5,25 +5,27 @@ const AddressService = require('./services/AddressService')
 const fetch = require('node-fetch')
 const bitcoin = require('bitcoinjs-lib')
 
-function BlockIoSweep (network, bip32_private_key_1, private_key_2, destination_address, n, options) {
-  this.network = network
-  this.networkObj = networks[network]
-  this.bip32PrivKey = bip32_private_key_1
-  this.privateKey2 = private_key_2
-  this.toAddr = destination_address
-  this.n = n || BlockIoSweep.DEFAULT_N
-
-  if (options && typeof (options) === 'object') {
-    this.provider = options.provider || BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER
-    this.providerUrl = options.providerUrl || BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER_API_URL
-    this.feeRate = options.feeRate || BlockIoSweep.DEFAULT_FEE_RATE
-    this.maxTxInputs = options.maxTxInputs || BlockIoSweep.DEFAULT_MAX_TX_INPUTS
-  } else {
-    this.provider = BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER
-    this.providerUrl = BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER_API_URL
-    this.feeRate = BlockIoSweep.DEFAULT_FEE_RATE
-    this.maxTxInputs = BlockIoSweep.DEFAULT_MAX_TX_INPUTS
-  }
+function BlockIoSweep (network, bip32_private_key_1, private_key_2, destination_address, n, derivation_path, options) {
+    // TODO perform error checking on all these inputs
+    this.network = network
+    this.networkObj = networks[network]
+    this.bip32PrivKey = bip32_private_key_1
+    this.privateKey2 = private_key_2
+    this.toAddr = destination_address
+    this.derivationPath = derivation_path
+    this.n = n || BlockIoSweep.DEFAULT_N
+    
+    if (options && typeof (options) === 'object') {
+	this.provider = options.provider || BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER
+	this.providerUrl = options.providerUrl || BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER_API_URL
+	this.feeRate = options.feeRate || BlockIoSweep.DEFAULT_FEE_RATE
+	this.maxTxInputs = options.maxTxInputs || BlockIoSweep.DEFAULT_MAX_TX_INPUTS
+    } else {
+	this.provider = BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER
+	this.providerUrl = BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER_API_URL
+	this.feeRate = BlockIoSweep.DEFAULT_FEE_RATE
+	this.maxTxInputs = BlockIoSweep.DEFAULT_MAX_TX_INPUTS
+    }
 }
 
 BlockIoSweep.DEFAULT_N = parseInt(constants.N)
@@ -55,7 +57,7 @@ BlockIoSweep.prototype.begin = async function () {
 	getTxApiUrl = this.providerUrl + 'get_tx/' + this.network + '/'
     }
     
-    const utxoMap = await createBalanceMap(this.n, this.bip32PrivKey, publicKey2, this.networkObj, this.network, getUtxoApiUrl, getTxApiUrl)
+    const utxoMap = await createBalanceMap(this.n, this.bip32PrivKey, publicKey2, this.networkObj, this.network, this.derivationPath, getUtxoApiUrl, getTxApiUrl)
     
     const txs = []
     const networkFees = []
@@ -70,7 +72,7 @@ BlockIoSweep.prototype.begin = async function () {
     let addrIte = 0
     
     for (const address of Object.keys(utxoMap)) {
-	const path = 'm/' + utxoMap[address].i + '/0' // default path
+	const path = this.derivationPath.replace("i", utxoMap[address].i.toString())
 	const childNode = hdRoot.derivePath(path)
 	const pubkey = childNode.publicKey
 	
@@ -194,38 +196,38 @@ function getNetworkFee (psbt, bech32, feeRate) {
   }
 }
 
-async function createBalanceMap (n, bip32Priv, pubKey, networkObj, network, utxoApiUrl, getTxApiUrl) {
+async function createBalanceMap (n, bip32Priv, pubKey, networkObj, network, derivationPath, utxoApiUrl, getTxApiUrl) {
   const balanceMap = {}
     for (var i = 0; i <= n; i++) {
         console.log('Evaluating addresses at i=' + i)
 	if (network !== constants.NETWORKS.DOGE && network !== constants.NETWORKS.DOGETEST) {
-	    await addAddrToMap(balanceMap, constants.P2WSH_P2SH, i, bip32Priv, pubKey, networkObj, utxoApiUrl, getTxApiUrl)
-	    await addAddrToMap(balanceMap, constants.P2WSH, i, bip32Priv, pubKey, networkObj, utxoApiUrl, getTxApiUrl)
+	    await addAddrToMap(balanceMap, constants.P2WSH_P2SH, i, bip32Priv, pubKey, networkObj, derivationPath, utxoApiUrl, getTxApiUrl)
+	    await addAddrToMap(balanceMap, constants.P2WSH, i, bip32Priv, pubKey, networkObj, derivationPath, utxoApiUrl, getTxApiUrl)
 	}
-        await addAddrToMap(balanceMap, constants.P2SH, i, bip32Priv, pubKey, networkObj, utxoApiUrl, getTxApiUrl)
+        await addAddrToMap(balanceMap, constants.P2SH, i, bip32Priv, pubKey, networkObj, derivationPath, utxoApiUrl, getTxApiUrl)
     }
     
     return balanceMap
 }
 
-async function addAddrToMap (balanceMap, addrType, i, bip32Priv, pubKey, networkObj, utxoApiUrl, getTxApiUrl) {
+async function addAddrToMap (balanceMap, addrType, i, bip32Priv, pubKey, networkObj, derivationPath, utxoApiUrl, getTxApiUrl) {
     let payment
-    
+    const derivPath = derivationPath.replace("i",i.toString())
     switch (addrType) {
     case constants.P2WSH_P2SH:
-	payment = AddressService.generateP2WSHOverP2SHAddress(bip32Priv, pubKey, networkObj, i)
+	payment = AddressService.generateP2WSHOverP2SHAddress(bip32Priv, pubKey, networkObj, derivPath)
 	console.log(payment.address);
 	balanceMap[payment.address] = {}
 	balanceMap[payment.address].address_type = constants.P2WSH_P2SH
 	break
     case constants.P2WSH:
-	payment = AddressService.generateWitnessV0Address(bip32Priv, pubKey, networkObj, i)
+	payment = AddressService.generateWitnessV0Address(bip32Priv, pubKey, networkObj, derivPath)
 	console.log(payment.address);
 	balanceMap[payment.address] = {}
 	balanceMap[payment.address].address_type = constants.P2WSH
 	break
     case constants.P2SH:
-	payment = AddressService.generateP2SHAddress(bip32Priv, pubKey, networkObj, i)
+	payment = AddressService.generateP2SHAddress(bip32Priv, pubKey, networkObj, derivPath)
 	console.log(payment.address);
 	balanceMap[payment.address] = {}
 	balanceMap[payment.address].address_type = constants.P2SH
