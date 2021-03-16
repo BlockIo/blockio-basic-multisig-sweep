@@ -26,128 +26,125 @@ function BlockIoSweep (network, bip32_private_key_1, private_key_2, destination_
   }
 }
 
-BlockIoSweep.DEFAULT_N = constants.N
+BlockIoSweep.DEFAULT_N = parseInt(constants.N)
 BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER = constants.BLOCKCHAIN_PROVIDER_DEFAULT
 BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER_API_URL = constants.BLOCKCHAIN_PROVIDER_URL_DEFAULT
 BlockIoSweep.DEFAULT_FEE_RATE = constants.FEE_RATE
 BlockIoSweep.DEFAULT_MAX_TX_INPUTS = constants.MAX_TX_INPUTS
 
 BlockIoSweep.prototype.begin = async function () {
-  if (this.network !== constants.NETWORKS.BTC && this.network !== constants.NETWORKS.BTCTEST &&
-      this.network !== constants.NETWORKS.LTC && this.network !== constants.NETWORKS.LTCTEST &&
-      this.network !== constants.NETWORKS.DOGE && this.network !== constants.NETWORKS.DOGETEST) {
-    throw new Error('Valid network not provided')
-  }
-  if (!this.bip32PrivKey || !this.privateKey2) {
-    throw new Error('Private keys not provided')
-  }
-  if (!this.toAddr) {
-    throw new Error('Destination address not provided')
-  }
-  const publicKey2 = bitcoin.ECPair.fromWIF(this.privateKey2, this.networkObj).publicKey.toString('hex')
-  let getUtxoApiUrl
-  let sendTxApiUrl
-  let getTxApiUrl
-
-  if (this.provider === BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER) {
-    sendTxApiUrl = this.providerUrl + 'send_tx/' + this.network
-    getUtxoApiUrl = this.providerUrl + 'get_tx_unspent/' + this.network + '/'
-    getTxApiUrl = this.providerUrl + 'get_tx/' + this.network + '/'
-  }
-
-  try {
+    if (this.network !== constants.NETWORKS.BTC && this.network !== constants.NETWORKS.BTCTEST &&
+	this.network !== constants.NETWORKS.LTC && this.network !== constants.NETWORKS.LTCTEST &&
+	this.network !== constants.NETWORKS.DOGE && this.network !== constants.NETWORKS.DOGETEST) {
+	throw new Error('Valid network not provided')
+    }
+    if (!this.bip32PrivKey || !this.privateKey2) {
+	throw new Error('Private keys not provided')
+    }
+    if (!this.toAddr) {
+	throw new Error('Destination address not provided')
+    }
+    const publicKey2 = bitcoin.ECPair.fromWIF(this.privateKey2, this.networkObj).publicKey.toString('hex')
+    let getUtxoApiUrl
+    let sendTxApiUrl
+    let getTxApiUrl
+    
+    if (this.provider === BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER) {
+	sendTxApiUrl = this.providerUrl + 'send_tx/' + this.network
+	getUtxoApiUrl = this.providerUrl + 'get_tx_unspent/' + this.network + '/'
+	getTxApiUrl = this.providerUrl + 'get_tx/' + this.network + '/'
+    }
+    
     const utxoMap = await createBalanceMap(this.n, this.bip32PrivKey, publicKey2, this.networkObj, this.network, getUtxoApiUrl, getTxApiUrl)
-
+    
     const txs = []
     const networkFees = []
     let psbt = new bitcoin.Psbt({ network: this.networkObj })
-
+    
     const hdRoot = bitcoin.bip32.fromBase58(this.bip32PrivKey, this.networkObj)
     const masterFingerprint = hdRoot.fingerprint
-
+    
     let balToSweep = 0
     let inputNum = 0
     const addressCount = Object.keys(utxoMap).length - 1
     let addrIte = 0
-
+    
     for (const address of Object.keys(utxoMap)) {
-      const path = 'm/' + utxoMap[address].i + '/0' // default path
-      const childNode = hdRoot.derivePath(path)
-      const pubkey = childNode.publicKey
-
-      const updateData = {
-        bip32Derivation: [
-          {
-            masterFingerprint,
-            path,
-            pubkey
-          }
-        ]
-      }
-      const addrTxCount = utxoMap[address].tx.length - 1
-      for (let i = 0; i < utxoMap[address].tx.length; i++) {
-        const utxo = utxoMap[address].tx[i]
-        balToSweep += parseFloat(utxo.value)
-        delete utxo.value
-        const input = {
-          ...utxo
-        }
-        psbt.addInput(input)
-        psbt.updateInput(inputNum++, updateData)
-        if (psbt.txInputs.length === this.maxTxInputs || (addrIte === addressCount && i === addrTxCount)) {
-          const balance = Math.floor(balToSweep * constants.SAT)
-          let allowTx = true
-          if (this.network === constants.NETWORKS.BTC || this.network === constants.NETWORKS.BTCTEST) {
-            if (balance <= constants.DUST.BTC) {
-              allowTx = false
+	const path = 'm/' + utxoMap[address].i + '/0' // default path
+	const childNode = hdRoot.derivePath(path)
+	const pubkey = childNode.publicKey
+	
+	const updateData = {
+            bip32Derivation: [
+		{
+		    masterFingerprint,
+		    path,
+		    pubkey
+		}
+            ]
+	}
+	const addrTxCount = utxoMap[address].tx.length - 1
+	for (let i = 0; i < utxoMap[address].tx.length; i++) {
+            const utxo = utxoMap[address].tx[i]
+            balToSweep += parseFloat(utxo.value)
+            delete utxo.value
+            const input = {
+		...utxo
             }
-          } else if (this.network === constants.NETWORKS.LTC || this.network === constants.NETWORKS.LTCTEST) {
-            if (balance <= constants.DUST.LTC) {
-              allowTx = false
+            psbt.addInput(input)
+            psbt.updateInput(inputNum++, updateData)
+            if (psbt.txInputs.length === this.maxTxInputs || (addrIte === addressCount && i === addrTxCount)) {
+		const balance = Math.floor(balToSweep * constants.SAT)
+		let allowTx = true
+		if (this.network === constants.NETWORKS.BTC || this.network === constants.NETWORKS.BTCTEST) {
+		    if (balance <= constants.DUST.BTC) {
+			allowTx = false
+		    }
+		} else if (this.network === constants.NETWORKS.LTC || this.network === constants.NETWORKS.LTCTEST) {
+		    if (balance <= constants.DUST.LTC) {
+			allowTx = false
+		    }
+		} else {
+		    if (balToSweep <= constants.DUST.DOGE) {
+			allowTx = false
+		    }
+		}
+		
+		if (!allowTx) {
+		    throw new Error('Amount less than dust being sent, tx aborted')
+		}
+		
+		const tempPsbt = psbt.clone()
+		createAndFinalizeTx(tempPsbt, this.toAddr, balToSweep, 0, hdRoot, this.privateKey2, this.networkObj)
+		const networkFee = getNetworkFee(tempPsbt, this.networkObj.bech32, this.feeRate)
+		createAndFinalizeTx(psbt, this.toAddr, balToSweep, networkFee, hdRoot, this.privateKey2, this.networkObj)
+		// disable fee check for doge
+		const tx = this.networkObj.bech32 ? psbt.extractTransaction() : psbt.extractTransaction(true)
+		const signedTransaction = tx.toHex()
+		txs.push(signedTransaction)
+		networkFees.push(networkFee)
+		
+		psbt = new bitcoin.Psbt({ network: this.networkObj })
+		inputNum = 0
+		balToSweep = 0
             }
-          } else {
-            if (balToSweep <= constants.DUST.DOGE) {
-              allowTx = false
-            }
-          }
-
-          if (!allowTx) {
-            throw new Error('Amount less than dust being sent, tx aborted')
-          }
-
-          const tempPsbt = psbt.clone()
-          createAndFinalizeTx(tempPsbt, this.toAddr, balToSweep, 0, hdRoot, this.privateKey2, this.networkObj)
-          const networkFee = getNetworkFee(tempPsbt, this.networkObj.bech32, this.feeRate)
-          createAndFinalizeTx(psbt, this.toAddr, balToSweep, networkFee, hdRoot, this.privateKey2, this.networkObj)
-          // disable fee check for doge
-          const tx = this.networkObj.bech32 ? psbt.extractTransaction() : psbt.extractTransaction(true)
-          const signedTransaction = tx.toHex()
-          txs.push(signedTransaction)
-          networkFees.push(networkFee)
-
-          psbt = new bitcoin.Psbt({ network: this.networkObj })
-          inputNum = 0
-          balToSweep = 0
-        }
-      }
-      addrIte++
+	}
+	addrIte++
     }
     if (!txs.length) {
-      throw new Error('No transaction created, do your addresses have balance?')
+	throw new Error('No transaction created, do your addresses have balance?')
     }
     for (const tx in txs) {
-      console.log('TX Hex:', txs[tx])
-      const ans = await promptConfirmation('Type y to broadcast tx, otherwise, press anything else: ')
-      if (ans !== 'y') {
-        console.log('Tx aborted')
-        continue
-      }
-      await sendTx(sendTxApiUrl, txs[tx])
-      console.log('Network fee:', networkFees[tx])
+	console.log('TX Hex:', txs[tx])
+	const ans = await promptConfirmation('Type y to broadcast tx, otherwise, press anything else: ')
+	if (ans !== 'y') {
+            console.log('Tx aborted')
+            continue
+	}
+	await sendTx(sendTxApiUrl, txs[tx])
+	console.log('Network fee:', networkFees[tx])
     }
-  } catch (err) {
-    throw new Error(err)
-  }
+
 }
 
 module.exports = BlockIoSweep
@@ -199,91 +196,79 @@ function getNetworkFee (psbt, bech32, feeRate) {
 
 async function createBalanceMap (n, bip32Priv, pubKey, networkObj, network, utxoApiUrl, getTxApiUrl) {
   const balanceMap = {}
-  try {
-    if (network !== constants.NETWORKS.DOGE && network !== constants.NETWORKS.DOGETEST) {
-      while (n) {
-        console.log('Evaluating addresses at i=' + n)
-        await addAddrToMap(balanceMap, constants.P2WSH_P2SH, parseInt(n), bip32Priv, pubKey, networkObj, utxoApiUrl, getTxApiUrl)
-        await addAddrToMap(balanceMap, constants.P2WSH, parseInt(n), bip32Priv, pubKey, networkObj, utxoApiUrl, getTxApiUrl)
-        n--
-      }
-      console.log('Evaluating addresses at i=' + n)
-      await addAddrToMap(balanceMap, constants.P2SH, parseInt(n), bip32Priv, pubKey, networkObj, utxoApiUrl, getTxApiUrl)
-    } else {
-      while (n >= 0) {
-        console.log('Evaluating addresses at i=' + n)
-        await addAddrToMap(balanceMap, constants.P2SH, parseInt(n), bip32Priv, pubKey, networkObj, utxoApiUrl, getTxApiUrl)
-        n--
-      }
+    for (var i = 0; i <= n; i++) {
+        console.log('Evaluating addresses at i=' + i)
+	if (network !== constants.NETWORKS.DOGE && network !== constants.NETWORKS.DOGETEST) {
+	    await addAddrToMap(balanceMap, constants.P2WSH_P2SH, i, bip32Priv, pubKey, networkObj, utxoApiUrl, getTxApiUrl)
+	    await addAddrToMap(balanceMap, constants.P2WSH, i, bip32Priv, pubKey, networkObj, utxoApiUrl, getTxApiUrl)
+	}
+        await addAddrToMap(balanceMap, constants.P2SH, i, bip32Priv, pubKey, networkObj, utxoApiUrl, getTxApiUrl)
     }
+    
     return balanceMap
-  } catch (err) {
-    throw new Error(err)
-  }
 }
 
-async function addAddrToMap (balanceMap, addrType, n, bip32Priv, pubKey, networkObj, utxoApiUrl, getTxApiUrl) {
-  let payment
-
-  switch (addrType) {
+async function addAddrToMap (balanceMap, addrType, i, bip32Priv, pubKey, networkObj, utxoApiUrl, getTxApiUrl) {
+    let payment
+    
+    switch (addrType) {
     case constants.P2WSH_P2SH:
-      payment = AddressService.generateSubsequentBlockioAddress(bip32Priv, pubKey, networkObj, n)
-      balanceMap[payment.address] = {}
-      balanceMap[payment.address].address_type = constants.P2WSH_P2SH
-      break
+	payment = AddressService.generateP2WSHOverP2SHAddress(bip32Priv, pubKey, networkObj, i)
+	console.log(payment.address);
+	balanceMap[payment.address] = {}
+	balanceMap[payment.address].address_type = constants.P2WSH_P2SH
+	break
     case constants.P2WSH:
-      payment = AddressService.generateP2wshBlockioAddress(bip32Priv, pubKey, networkObj, n)
-      balanceMap[payment.address] = {}
-      balanceMap[payment.address].address_type = constants.P2WSH
-      break
+	payment = AddressService.generateWitnessV0Address(bip32Priv, pubKey, networkObj, i)
+	console.log(payment.address);
+	balanceMap[payment.address] = {}
+	balanceMap[payment.address].address_type = constants.P2WSH
+	break
     case constants.P2SH:
-      payment = AddressService.generateDefaultBlockioAddress(bip32Priv, pubKey, networkObj, n)
-      balanceMap[payment.address] = {}
-      balanceMap[payment.address].address_type = constants.P2SH
-      break
-  }
-
-  try {
+	payment = AddressService.generateP2SHAddress(bip32Priv, pubKey, networkObj, i)
+	console.log(payment.address);
+	balanceMap[payment.address] = {}
+	balanceMap[payment.address].address_type = constants.P2SH
+	break
+    }
+    
     const addrUtxo = await AddressService.checkBlockioAddressBalance(utxoApiUrl + payment.address)
-
-    balanceMap[payment.address].i = n
+    
+    balanceMap[payment.address].i = i
     balanceMap[payment.address].tx = []
-
+    
     let x
     for (x of addrUtxo.data.txs) {
-      const unspentObj = {}
-      unspentObj.hash = x.txid
-      unspentObj.index = x.output_no
-      unspentObj.value = x.value
-      switch (addrType) {
+	const unspentObj = {}
+	unspentObj.hash = x.txid
+	unspentObj.index = x.output_no
+	unspentObj.value = x.value
+	switch (addrType) {
         case constants.P2WSH_P2SH:
-          unspentObj.witnessUtxo = {
-            script: Buffer.from(x.script_hex, 'hex'),
-            value: Math.ceil(parseFloat(x.value) * constants.SAT)
-          }
-          unspentObj.redeemScript = payment.redeem.output
-          unspentObj.witnessScript = payment.redeem.redeem.output
-          break
+            unspentObj.witnessUtxo = {
+		script: Buffer.from(x.script_hex, 'hex'),
+		value: Math.ceil(parseFloat(x.value) * constants.SAT)
+            }
+            unspentObj.redeemScript = payment.redeem.output
+            unspentObj.witnessScript = payment.redeem.redeem.output
+            break
         case constants.P2WSH:
-          unspentObj.witnessUtxo = {
-            script: Buffer.from(x.script_hex, 'hex'),
-            value: Math.ceil(parseFloat(x.value) * constants.SAT)
-          }
-          unspentObj.witnessScript = payment.redeem.output
-          break
+            unspentObj.witnessUtxo = {
+		script: Buffer.from(x.script_hex, 'hex'),
+		value: Math.ceil(parseFloat(x.value) * constants.SAT)
+            }
+            unspentObj.witnessScript = payment.redeem.output
+            break
         case constants.P2SH:
-          unspentObj.nonWitnessUtxo = Buffer.from(await getTxHex(getTxApiUrl + x.txid), 'hex')
-          unspentObj.redeemScript = payment.redeem.output
-          break
-      }
-      balanceMap[payment.address].tx.push(unspentObj)
+            unspentObj.nonWitnessUtxo = Buffer.from(await getTxHex(getTxApiUrl + x.txid), 'hex')
+            unspentObj.redeemScript = payment.redeem.output
+            break
+	}
+	balanceMap[payment.address].tx.push(unspentObj)
     }
     if (!balanceMap[payment.address].tx.length) {
-      delete balanceMap[payment.address]
+	delete balanceMap[payment.address]
     }
-  } catch (err) {
-    throw new Error(err)
-  }
 }
 
 async function getTxHex (apiUrl) {
