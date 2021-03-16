@@ -205,9 +205,11 @@ async function createBalanceMap (n, bip32Priv, pubKey, networkObj, network, utxo
         console.log('Evaluating addresses at i=' + n)
         await addAddrToMap(balanceMap, constants.P2WSH_P2SH, parseInt(n), bip32Priv, pubKey, networkObj, utxoApiUrl, getTxApiUrl)
         await addAddrToMap(balanceMap, constants.P2WSH, parseInt(n), bip32Priv, pubKey, networkObj, utxoApiUrl, getTxApiUrl)
+        await addAddrToMap(balanceMap, constants.P2SH, parseInt(n), bip32Priv, pubKey, networkObj, utxoApiUrl, getTxApiUrl)
         n--
       }
       console.log('Evaluating addresses at i=' + n)
+      await addAddrToMap(balanceMap, constants.P2WSH_P2SH, parseInt(n), bip32Priv, pubKey, networkObj, utxoApiUrl, getTxApiUrl)
       await addAddrToMap(balanceMap, constants.P2SH, parseInt(n), bip32Priv, pubKey, networkObj, utxoApiUrl, getTxApiUrl)
     } else {
       while (n >= 0) {
@@ -227,7 +229,7 @@ async function addAddrToMap (balanceMap, addrType, n, bip32Priv, pubKey, network
 
   switch (addrType) {
     case constants.P2WSH_P2SH:
-      payment = AddressService.generateSubsequentBlockioAddress(bip32Priv, pubKey, networkObj, n)
+      payment = AddressService.generateP2wshP2shBlockioAddr(bip32Priv, pubKey, networkObj, n)
       balanceMap[payment.address] = {}
       balanceMap[payment.address].address_type = constants.P2WSH_P2SH
       break
@@ -237,7 +239,7 @@ async function addAddrToMap (balanceMap, addrType, n, bip32Priv, pubKey, network
       balanceMap[payment.address].address_type = constants.P2WSH
       break
     case constants.P2SH:
-      payment = AddressService.generateDefaultBlockioAddress(bip32Priv, pubKey, networkObj, n)
+      payment = AddressService.generateP2shBlockioAddr(bip32Priv, pubKey, networkObj, n)
       balanceMap[payment.address] = {}
       balanceMap[payment.address].address_type = constants.P2SH
       break
