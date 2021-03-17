@@ -73,7 +73,7 @@ describe('Address generation', () => {
     it('got correct default address for DOGETEST at m/0/0', () => {
       expect(AddressService.generateAddress(constants.P2SH, bip32Priv, pubKey2, network, 'm/0/0').address).to.equal(expectedDefaultAddr)
     })
-    it('got correct subsequent address for DOGETEST at m/1/0', () => {
+    it('got correct P2SH address for DOGETEST at m/1/0', () => {
       expect(AddressService.generateAddress(constants.P2SH, bip32Priv, pubKey2, network, 'm/1/0').address).to.equal(expectedSubsequentAddr)
     })
   })
