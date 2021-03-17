@@ -18,8 +18,6 @@
   "homepage": "https://github.com/nwasiq/sweep_to_addr#readme",
   "dependencies": {
     "bitcoinjs-lib": "^5.2.0",
-    "block_io": "^3.0.4",
-    "coininfo": "^5.1.0",
     "dotenv": "^8.2.0",
     "node-fetch": "^2.6.1"
   }

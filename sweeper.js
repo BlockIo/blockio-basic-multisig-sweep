@@ -58,9 +58,9 @@ BlockIoSweep.prototype.begin = async function () {
     }
     
     const utxoMap = await createBalanceMap(this.n, this.bip32PrivKey, publicKey2, this.networkObj, this.network, this.derivationPath, getUtxoApiUrl, getTxApiUrl)
-    
-    const txs = []
-    const networkFees = []
+
+    let txs = []
+
     let psbt = new bitcoin.Psbt({ network: this.networkObj })
     
     const hdRoot = bitcoin.bip32.fromBase58(this.bip32PrivKey, this.networkObj)
@@ -85,10 +85,12 @@ BlockIoSweep.prototype.begin = async function () {
 		}
             ]
 	}
+	
 	const addrTxCount = utxoMap[address].tx.length - 1
+	
 	for (let i = 0; i < utxoMap[address].tx.length; i++) {
             const utxo = utxoMap[address].tx[i]
-            balToSweep += parseFloat(utxo.value)
+            balToSweep += getCoinValue(utxo.value)
             delete utxo.value
             const input = {
 		...utxo
@@ -96,14 +98,13 @@ BlockIoSweep.prototype.begin = async function () {
             psbt.addInput(input)
             psbt.updateInput(inputNum++, updateData)
             if (psbt.txInputs.length === this.maxTxInputs || (addrIte === addressCount && i === addrTxCount)) {
-		const balance = Math.floor(balToSweep * constants.SAT)
 		let allowTx = true
 		if (this.network === constants.NETWORKS.BTC || this.network === constants.NETWORKS.BTCTEST) {
-		    if (balance <= constants.DUST.BTC) {
+		    if (balToSweep <= constants.DUST.BTC) {
 			allowTx = false
 		    }
 		} else if (this.network === constants.NETWORKS.LTC || this.network === constants.NETWORKS.LTCTEST) {
-		    if (balance <= constants.DUST.LTC) {
+		    if (balToSweep <= constants.DUST.LTC) {
 			allowTx = false
 		    }
 		} else {
@@ -115,17 +116,26 @@ BlockIoSweep.prototype.begin = async function () {
 		if (!allowTx) {
 		    throw new Error('Amount less than dust being sent, tx aborted')
 		}
-		
+
+		// create the transaction without network fees
 		const tempPsbt = psbt.clone()
 		createAndFinalizeTx(tempPsbt, this.toAddr, balToSweep, 0, hdRoot, this.privateKey2, this.networkObj)
-		const networkFee = getNetworkFee(tempPsbt, this.networkObj.bech32, this.feeRate)
+
+		// we know the size of the transaction now,
+		// calculate the network fee, and recreate the appropriate transaction
+		const networkFee = getNetworkFee(this.network, tempPsbt, this.feeRate)
 		createAndFinalizeTx(psbt, this.toAddr, balToSweep, networkFee, hdRoot, this.privateKey2, this.networkObj)
-		// disable fee check for doge
-		const tx = this.networkObj.bech32 ? psbt.extractTransaction() : psbt.extractTransaction(true)
-		const signedTransaction = tx.toHex()
-		txs.push(signedTransaction)
-		networkFees.push(networkFee)
+
+		if (psbt.getFee() > constants.NETWORK_FEE_MAX[this.network]) {
+		    throw " *** WARNING: max network fee exceeded. This transaction has a network fee of " + psbt.getFee().toString() + " sats, whereas the maximum network fee allowed is " + constants.NETWORK_FEE_MAX[this.network].toString() + " sats";
+		}
+
+		let extracted_tx = psbt.extractTransaction()
 		
+		// we'll show the network fee, the network fee rate, and the transaction hex for the user to independently verify before broadcast
+		// we don't ask bitcoinjs to enforce the max fee rate here, we've already done it above ourselves
+		txs.push({ network_fee: psbt.getFee(), network_fee_rate: psbt.getFeeRate(), tx_hex: extracted_tx.toHex(), tx_size: extracted_tx.virtualSize() })
+
 		psbt = new bitcoin.Psbt({ network: this.networkObj })
 		inputNum = 0
 		balToSweep = 0
@@ -133,18 +143,31 @@ BlockIoSweep.prototype.begin = async function () {
 	}
 	addrIte++
     }
+
     if (!txs.length) {
 	throw new Error('No transaction created, do your addresses have balance?')
     }
-    for (const tx in txs) {
-	console.log('TX Hex:', txs[tx])
-	const ans = await promptConfirmation('Type y to broadcast tx, otherwise, press anything else: ')
-	if (ans !== 'y') {
-            console.log('Tx aborted')
+
+    for (var i = 0; i < txs.length; i++) {
+
+	const tx = txs[i]
+	
+	console.log('\n\nVERIFY THE FOLLOWING IS CORRECT INDEPENDENTLY:\n')
+	console.log('Network:', this.network)
+	console.log('Transaction Hex:', tx.tx_hex)
+	console.log('Network Fee Rate:', tx.network_fee_rate, "sats/byte")
+	console.log('Transaction VSize:', tx.tx_size, "bytes")
+	console.log('Network Fee:', tx.network_fee, "sats", "(max allowed:", constants.NETWORK_FEE_MAX[this.network], "sats)")
+	
+	const ans = await promptConfirmation("\n\n*** YOU MUST INDEPENDENTLY VERIFY THE NETWORK FEE IS APPROPRIATE AND THE TRANSACTION IS PROPERLY CONSTRUCTED. ***\n*** ONCE A TRANSACTION IS BROADCAST TO THE NETWORK, IT IS CONSIDERED IRREVERSIBLE ***\n\nIf you approve of this transaction and have verified its accuracy, type '"+constants.TX_BROADCAST_APPROVAL_TEXT+"', otherwise, press enter: ")
+	
+	if (ans !== constants.TX_BROADCAST_APPROVAL_TEXT) {
+            console.log('\nTRANSACTION ABORTED\n')
             continue
 	}
-	await sendTx(sendTxApiUrl, txs[tx])
-	console.log('Network fee:', networkFees[tx])
+
+	await sendTx(sendTxApiUrl, tx.tx_hex)
+	
     }
 
 }
@@ -152,17 +175,22 @@ BlockIoSweep.prototype.begin = async function () {
 module.exports = BlockIoSweep
 
 function createAndFinalizeTx (psbt, toAddr, balance, networkFee, root, privKey, network) {
-  // for DOGE, network fee is in DOGE
-  const val = network.bech32 ? Math.floor((balance * constants.SAT) - networkFee) : Math.floor((balance - networkFee) * constants.SAT)
-  psbt.addOutput({
-    address: toAddr, // destination address
-    value: val// value in satoshi
-  })
-  for (let i = 0; i < psbt.txInputs.length; i++) {
-    psbt.signInputHD(i, root)
-    psbt.signInput(i, bitcoin.ECPair.fromWIF(privKey, network))
-  }
-  psbt.finalizeAllInputs()
+    // balance and network fee are in COIN
+
+    const val = balance - networkFee
+    
+    psbt.addOutput({
+	address: toAddr, // destination address
+	value: val// value in satoshi
+    })
+    
+    for (let i = 0; i < psbt.txInputs.length; i++) {
+	psbt.signInputHD(i, root)
+	psbt.signInput(i, bitcoin.ECPair.fromWIF(privKey, network))
+    }
+    
+    psbt.finalizeAllInputs()
+    
 }
 
 async function sendTx (apiUrl, txHex) {
@@ -185,15 +213,32 @@ async function sendTx (apiUrl, txHex) {
   }
 }
 
-function getNetworkFee (psbt, bech32, feeRate) {
-  const tx = psbt.extractTransaction()
-  const vSize = tx.virtualSize()
+function getNetworkFee (network, psbt, feeRate) {
+    const tx = psbt.extractTransaction()
+    const vSize = tx.virtualSize() // in bytes
 
-  if (bech32) {
-    return feeRate * vSize
-  } else {
-    return Math.ceil(vSize / 1000)
-  }
+    let f;
+    
+    if (network === constants.NETWORKS.DOGE || network === constants.NETWORKS.DOGETEST) {
+	// ignore fee rate for DOGE and DOGETEST
+	f = parseInt(constants.COIN) * Math.ceil(vSize / 1000)
+    } else {
+	f = feeRate * vSize
+    }
+    
+    return f
+}
+
+function getCoinValue(floatAsString) {
+    let s = floatAsString.split(".")
+
+    if (s[1] === undefined) { s[1] = "0" }
+
+    let r = parseInt("" + s[0] + s[1] + constants.COIN.substr(1, 8 - s[1].length))
+
+    if (r > Number.MAX_SAFE_INTEGER) { throw "Number exceeds MAX_SAFE_INTEGER" }
+
+    return r
 }
 
 async function createBalanceMap (n, bip32Priv, pubKey, networkObj, network, derivationPath, utxoApiUrl, getTxApiUrl) {
@@ -233,7 +278,7 @@ async function addAddrToMap (balanceMap, addrType, i, bip32Priv, pubKey, network
         case constants.P2WSH_P2SH:
             unspentObj.witnessUtxo = {
 		script: Buffer.from(x.script_hex, 'hex'),
-		value: Math.ceil(parseFloat(x.value) * constants.SAT)
+		value: getCoinValue(x.value)
             }
             unspentObj.redeemScript = payment.redeem.output
             unspentObj.witnessScript = payment.redeem.redeem.output
@@ -241,7 +286,7 @@ async function addAddrToMap (balanceMap, addrType, i, bip32Priv, pubKey, network
         case constants.P2WSH:
             unspentObj.witnessUtxo = {
 		script: Buffer.from(x.script_hex, 'hex'),
-		value: Math.ceil(parseFloat(x.value) * constants.SAT)
+		value: getCoinValue(x.value)
             }
             unspentObj.witnessScript = payment.redeem.output
             break
