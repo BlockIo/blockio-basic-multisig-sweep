@@ -1,12 +1,12 @@
 const bitcoin = require('bitcoinjs-lib')
 const fetch = require('node-fetch')
 
-const AddressService = function () {}
+const AddressService = function () { }
 
-// generate a P2SH, pay-to-multisig (2-of-2) address
-AddressService.prototype.generateP2shBlockioAddr = (bip32PrivKey, secondaryPubKey, network, i) => {
-  // DOGE addresses are generated only using this function
-  const PUB1 = bitcoin.bip32.fromBase58(bip32PrivKey, network).derivePath('m/' + i + '/0').publicKey
+AddressService.prototype.generateAddress = (addrType, bip32PrivKey, secondaryPubKey, network, derivationPath) => {
+  // generates P2SH, P2WSH-P2SH, or WITNESS_V0 addresses
+
+  const PUB1 = bitcoin.bip32.fromBase58(bip32PrivKey, network).derivePath(derivationPath).publicKey
   const PUB2 = Buffer.from(secondaryPubKey, 'hex')
   const pubkeys = [PUB1, PUB2]
 
@@ -16,54 +16,23 @@ AddressService.prototype.generateP2shBlockioAddr = (bip32PrivKey, secondaryPubKe
     network: network
   }
 
-  // for LTC (old accounts), get incorrect address if network is provided in p2msOpts
-  // if (network.bech32 && network.bech32 === 'ltc') {
-  //   delete p2msOpts.network
-  // }
+  let output
 
-  const output = bitcoin.payments.p2sh({
-    redeem: bitcoin.payments.p2ms(p2msOpts)
-  })
-  return output
-}
-
-// generate a P2SH(P2WSH(...)), pay-to-multisig (2-of-2) address
-AddressService.prototype.generateP2wshP2shBlockioAddr = (bip32PrivKey, secondaryPubKey, network, i) => {
-  const PUB1 = bitcoin.bip32.fromBase58(bip32PrivKey, network).derivePath('m/' + i + '/0').publicKey
-  const PUB2 = Buffer.from(secondaryPubKey, 'hex')
-  const pubkeys = [PUB1, PUB2]
-
-  const p2msOpts = {
-    m: 2,
-    pubkeys,
-    network: network
+  if (addrType === 'P2SH') {
+    output = bitcoin.payments.p2sh({ redeem: bitcoin.payments.p2ms(p2msOpts) })
+  } else if (addrType === 'P2WSH-P2SH') {
+    output = bitcoin.payments.p2sh({ redeem: bitcoin.payments.p2wsh({ redeem: bitcoin.payments.p2ms(p2msOpts) }) })
+  } else if (addrType === 'WITNESS_V0') {
+    output = bitcoin.payments.p2wsh({ redeem: bitcoin.payments.p2ms(p2msOpts) })
+  } else {
+    throw new Error('Address type must be P2SH, P2WSH-P2SH, or WITNESS_0')
   }
-  // for LTC (old accounts), get incorrect address if network is provided in p2msOpts
-  // if (network.bech32 && network.bech32 === 'ltc') {
-  //   delete p2msOpts.network
-  // }
 
-  const output = bitcoin.payments.p2sh({
-    redeem: bitcoin.payments.p2wsh({
-      redeem: bitcoin.payments.p2ms(p2msOpts)
-    })
-  })
-  return output
-}
-
-// generate a P2WSH (SegWit), pay-to-multisig (2-of-2) address
-AddressService.prototype.generateP2wshBlockioAddress = (bip32PrivKey, secondaryPubKey, network, i) => {
-  const PUB1 = bitcoin.bip32.fromBase58(bip32PrivKey, network).derivePath('m/' + i + '/0').publicKey
-  const PUB2 = Buffer.from(secondaryPubKey, 'hex')
-
-  const pubkeys = [PUB1, PUB2]
-  const output = bitcoin.payments.p2wsh({
-    redeem: bitcoin.payments.p2ms({ m: 2, pubkeys, network: network })
-  })
   return output
 }
 
 AddressService.prototype.checkBlockioAddressBalance = async (apiUrl) => {
+  // TODO rewrite
   try {
     const res = await fetch(apiUrl)
     const json = await res.json()
