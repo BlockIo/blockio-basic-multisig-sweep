@@ -8,6 +8,16 @@ module.exports = {
   MAX_TX_INPUTS: 500,
   BLOCKCHAIN_PROVIDER_DEFAULT: 'sochain',
   BLOCKCHAIN_PROVIDER_URL_DEFAULT: 'https://sochain.com/api/v2/',
+  PROVIDERS: {
+    SOCHAIN: 'sochain',
+    MEMPOOL: 'mempool',
+    BLOCKCHAIN: 'blockchain'
+  },
+  PROVIDER_URLS: {
+    SOCHAIN: 'https://sochain.com/api/v2',
+    MEMPOOL: 'https://mempool.space/api',
+    BLOCKCHAIN: 'https://blockchain.info'
+  },
   NETWORKS: {
     BTC: 'BTC',
     BTCTEST: 'BTCTEST',
