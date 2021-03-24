@@ -2,11 +2,13 @@ const constants = require('../constants')
 const fetch = require('node-fetch')
 
 const ProviderService = function (provider, network) {
-  if (Object.values(constants.PROVIDERS).indexOf(provider) < 0) {
+  const providerIndex = Object.values(constants.PROVIDERS).indexOf(provider)
+  if (providerIndex < 0) {
     throw new Error('Blockchain provider not supported')
   }
-  if (provider === constants.PROVIDERS.MEMPOOL && network !== constants.NETWORKS.BTC) {
-    throw new Error('Mempool only supports BTC network')
+  const providerKey = Object.keys(constants.PROVIDER_URLS)[providerIndex]
+  if (constants.PROVIDER_URLS[providerKey].SUPPORT.indexOf(network) < 0) {
+    throw new Error('Network not supported by provider')
   }
   this.network = network
   this.provider = provider
@@ -16,19 +18,19 @@ ProviderService.prototype.getTxHex = async function (txId) {
   try {
     switch (this.provider) {
       case constants.PROVIDERS.SOCHAIN: {
-        const apiUrl = [constants.PROVIDER_URLS.SOCHAIN, 'get_tx', this.network, txId].join('/')
+        const apiUrl = [constants.PROVIDER_URLS.SOCHAIN.URL, 'get_tx', this.network, txId].join('/')
         const res = await fetchUrl(apiUrl)
         const json = await res.json()
         return json.data.tx_hex
       }
-      case constants.PROVIDERS.MEMPOOL: {
-        const apiUrl = [constants.PROVIDER_URLS.MEMPOOL, 'tx', txId, 'hex'].join('/')
+      case constants.PROVIDERS.MEMPOOLSPACE: {
+        const apiUrl = [constants.PROVIDER_URLS.MEMPOOLSPACE.URL, 'tx', txId, 'hex'].join('/')
         const res = await fetchUrl(apiUrl)
         const hex = await res.text()
         return hex
       }
-      case constants.PROVIDERS.BLOCKCHAIN: {
-        const apiUrl = [constants.PROVIDER_URLS.BLOCKCHAIN, 'rawtx', txId, '?format=hex'].join('/')
+      case constants.PROVIDERS.BLOCKCHAINCOM: {
+        const apiUrl = [constants.PROVIDER_URLS.BLOCKCHAINCOM.URL, 'rawtx', txId, '?format=hex'].join('/')
         const res = await fetchUrl(apiUrl)
         const hex = await res.text()
         return hex

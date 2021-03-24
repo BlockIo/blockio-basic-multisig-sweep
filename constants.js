@@ -8,15 +8,26 @@ module.exports = {
   MAX_TX_INPUTS: 500,
   BLOCKCHAIN_PROVIDER_DEFAULT: 'sochain',
   BLOCKCHAIN_PROVIDER_URL_DEFAULT: 'https://sochain.com/api/v2/',
+  // the order of provider names matters in PROVIDERS and PROVIDER_URLS
+  // the order needs to be the same
   PROVIDERS: {
     SOCHAIN: 'sochain',
-    MEMPOOL: 'mempool',
-    BLOCKCHAIN: 'blockchain'
+    MEMPOOLSPACE: 'mempoolspace',
+    BLOCKCHAINCOM: 'blockchaincom'
   },
   PROVIDER_URLS: {
-    SOCHAIN: 'https://sochain.com/api/v2',
-    MEMPOOL: 'https://mempool.space/api',
-    BLOCKCHAIN: 'https://blockchain.info'
+    SOCHAIN: {
+      URL: 'https://sochain.com/api/v2',
+      SUPPORT: ['BTC', 'LTC', 'DOGE']
+    },
+    MEMPOOLSPACE: {
+      URL: 'https://mempool.space/api',
+      SUPPORT: ['BTC']
+    },
+    BLOCKCHAINCOM: {
+      URL: 'https://blockchain.info',
+      SUPPORT: ['BTC', 'LTC', 'DOGE']
+    }
   },
   NETWORKS: {
     BTC: 'BTC',

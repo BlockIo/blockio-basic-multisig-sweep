@@ -43,4 +43,4 @@ AddressService.prototype.checkBlockioAddressBalance = async (apiUrl) => {
   }
 }
 
-module.exports = new AddressService()
+module.exports = AddressService
