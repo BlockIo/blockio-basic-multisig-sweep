@@ -84,11 +84,48 @@ ProviderService.prototype.getUtxo = async function (addr) {
   }
 }
 
+ProviderService.prototype.sendTx = async function (txHex) {
+  try {
+    switch (this.provider) {
+      case constants.PROVIDERS.SOCHAIN: {
+        const apiUrl = [constants.PROVIDER_URLS.SOCHAIN.URL, 'send_tx', this.network].join('/')
+        await broadcastTx(apiUrl, txHex)
+        return
+      }
+      default: {
+        throw new Error('Could not send tx with provider: ' + this.provider)
+      }
+    }
+  } catch (err) {
+    throw new Error(err)
+  }
+}
+
 module.exports = ProviderService
 
 async function fetchUrl (url) {
   try {
     return await fetch(url)
+  } catch (err) {
+    throw new Error(err)
+  }
+}
+
+async function broadcastTx (apiUrl, txHex) {
+  try {
+    let res = await fetch(apiUrl, {
+      method: 'POST',
+      body: JSON.stringify({ tx_hex: txHex }),
+      headers: { 'Content-Type': 'application/json' }
+    })
+    res = await res.json()
+    if (res.status === 'success') {
+      console.log('Sweep Success!')
+      console.log('Tx_id:', res.data.txid)
+    } else {
+      console.log('Sweep Failed:')
+      throw new Error(JSON.stringify(res.data))
+    }
   } catch (err) {
     throw new Error(err)
   }
