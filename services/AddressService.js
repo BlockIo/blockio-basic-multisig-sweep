@@ -3,10 +3,28 @@ const fetch = require('node-fetch')
 
 const AddressService = function () { }
 
-AddressService.prototype.generateAddress = (addrType, bip32PrivKey, secondaryPubKey, network, derivationPath) => {
+AddressService.prototype.generateAddress = (addrType, bip32PrivKey, secondaryPubKey, network, i, derivationPath) => {
   // generates P2SH, P2WSH-P2SH, or WITNESS_V0 addresses
 
-  const PUB1 = bitcoin.bip32.fromBase58(bip32PrivKey, network).derivePath(derivationPath).publicKey
+  const derivPath = derivationPath.replace('i', i.toString())
+  const extKeyStandard = bitcoin.bip32.fromBase58(bip32PrivKey, network)
+  // the nonstandard bip32 object
+  const extKeyNonstandard = bitcoin.bip32.fromBase58(bip32PrivKey, network)
+
+  const child = extKeyNonstandard.derive(i)
+  child.chainCode = Buffer.from(child.chainCode.toString('hex').replace(/^(00)+/, ''), 'hex')
+
+  const leafNonStandard = child.derive(0)
+  const leafStandard = extKeyStandard.derivePath(derivPath)
+
+  let PUB1 = leafStandard.publicKey
+  let isStandard = true
+  if (leafNonStandard.publicKey.toString('hex') !== leafStandard.publicKey.toString('hex')) {
+    // will use non standard pubKey
+    PUB1 = leafNonStandard.publicKey
+    isStandard = false
+  }
+
   const PUB2 = Buffer.from(secondaryPubKey, 'hex')
   const pubkeys = [PUB1, PUB2]
 
@@ -28,7 +46,7 @@ AddressService.prototype.generateAddress = (addrType, bip32PrivKey, secondaryPub
     throw new Error('Address type must be P2SH, P2WSH-P2SH, or WITNESS_0')
   }
 
-  return output
+  return { output, isStandard }
 }
 
 AddressService.prototype.checkBlockioAddressBalance = async (apiUrl) => {

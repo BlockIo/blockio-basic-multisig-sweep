@@ -64,9 +64,18 @@ BlockIoSweep.prototype.begin = async function () {
     let inputNum = 0
 
     for (const address of Object.keys(utxoMap)) {
-      const path = this.derivationPath.replace('i', utxoMap[address].i.toString())
-      const child = root.derivePath(path)
-      const key = bitcoin.ECPair.fromPrivateKey(child.privateKey, { network: this.networkObj })
+      const isStandard = utxoMap[address].isStandard
+      let key
+      if (isStandard) {
+        const path = this.derivationPath.replace('i', utxoMap[address].i.toString())
+        const child = root.derivePath(path)
+        key = bitcoin.ECPair.fromPrivateKey(child.privateKey, { network: this.networkObj })
+      } else {
+        const child = root.derive(utxoMap[address].i)
+        child.chainCode = Buffer.from(child.chainCode.toString('hex').replace(/^(00)+/, ''), 'hex')
+        const leaf = child.derive(0)
+        key = bitcoin.ECPair.fromPrivateKey(leaf.privateKey, { network: this.networkObj })
+      }
 
       const addrTxCount = utxoMap[address].tx.length - 1
 
@@ -219,8 +228,9 @@ async function createBalanceMap (n, bip32Priv, pubKey, networkObj, network, deri
 }
 
 async function addAddrToMap (balanceMap, addrType, i, bip32Priv, pubKey, networkObj, derivationPath, providerService) {
-  const derivPath = derivationPath.replace('i', i.toString())
-  const payment = AddressService.generateAddress(addrType, bip32Priv, pubKey, networkObj, derivPath)
+  const returnObj = AddressService.generateAddress(addrType, bip32Priv, pubKey, networkObj, i, derivationPath)
+  const isStandard = returnObj.isStandard
+  const payment = returnObj.output
   console.log('type=' + addrType + ' address=' + payment.address)
   balanceMap[payment.address] = {}
   balanceMap[payment.address].address_type = addrType
@@ -228,6 +238,7 @@ async function addAddrToMap (balanceMap, addrType, i, bip32Priv, pubKey, network
   const addrUtxo = await providerService.getUtxo(payment.address)
 
   balanceMap[payment.address].i = i
+  balanceMap[payment.address].isStandard = isStandard
   balanceMap[payment.address].tx = []
 
   let x
