@@ -55,28 +55,18 @@ BlockIoSweep.prototype.begin = async function () {
 
     let psbt = new bitcoin.Psbt({ network: this.networkObj })
 
-    const hdRoot = bitcoin.bip32.fromBase58(this.bip32PrivKey, this.networkObj)
-    const masterFingerprint = hdRoot.fingerprint
+    const root = bitcoin.bip32.fromBase58(this.bip32PrivKey, this.networkObj)
+    let ecKeys = {}
 
     let balToSweep = 0
-    let inputNum = 0
     const addressCount = Object.keys(utxoMap).length - 1
     let addrIte = 0
+    let inputNum = 0
 
     for (const address of Object.keys(utxoMap)) {
       const path = this.derivationPath.replace('i', utxoMap[address].i.toString())
-      const childNode = hdRoot.derivePath(path)
-      const pubkey = childNode.publicKey
-
-      const updateData = {
-        bip32Derivation: [
-          {
-            masterFingerprint,
-            path,
-            pubkey
-          }
-        ]
-      }
+      const child = root.derivePath(path)
+      const key = bitcoin.ECPair.fromPrivateKey(child.privateKey, { network: this.networkObj })
 
       const addrTxCount = utxoMap[address].tx.length - 1
 
@@ -88,7 +78,8 @@ BlockIoSweep.prototype.begin = async function () {
           ...utxo
         }
         psbt.addInput(input)
-        psbt.updateInput(inputNum++, updateData)
+        ecKeys[inputNum++] = key
+
         if (psbt.txInputs.length === this.maxTxInputs || (addrIte === addressCount && i === addrTxCount)) {
           let allowTx = true
           if (this.network === constants.NETWORKS.BTC || this.network === constants.NETWORKS.BTCTEST) {
@@ -111,12 +102,12 @@ BlockIoSweep.prototype.begin = async function () {
 
           // create the transaction without network fees
           const tempPsbt = psbt.clone()
-          createAndFinalizeTx(tempPsbt, this.toAddr, balToSweep, 0, hdRoot, this.privateKey2, this.networkObj)
+          createAndFinalizeTx(tempPsbt, this.toAddr, balToSweep, 0, ecKeys, this.privateKey2, this.networkObj)
 
           // we know the size of the transaction now,
           // calculate the network fee, and recreate the appropriate transaction
           const networkFee = getNetworkFee(this.network, tempPsbt, this.feeRate)
-          createAndFinalizeTx(psbt, this.toAddr, balToSweep, networkFee, hdRoot, this.privateKey2, this.networkObj)
+          createAndFinalizeTx(psbt, this.toAddr, balToSweep, networkFee, ecKeys, this.privateKey2, this.networkObj)
 
           if (psbt.getFee() > constants.NETWORK_FEE_MAX[this.network]) {
             throw new Error(' *** WARNING: max network fee exceeded. This transaction has a network fee of ' + psbt.getFee().toString() + ' sats, whereas the maximum network fee allowed is ' + constants.NETWORK_FEE_MAX[this.network].toString() + ' sats')
@@ -129,8 +120,9 @@ BlockIoSweep.prototype.begin = async function () {
           txs.push({ network_fee: psbt.getFee(), network_fee_rate: psbt.getFeeRate(), tx_hex: extracted_tx.toHex(), tx_size: extracted_tx.virtualSize() })
 
           psbt = new bitcoin.Psbt({ network: this.networkObj })
-          inputNum = 0
           balToSweep = 0
+          ecKeys = {}
+          inputNum = 0
         }
       }
       addrIte++
@@ -166,7 +158,7 @@ BlockIoSweep.prototype.begin = async function () {
 
 module.exports = BlockIoSweep
 
-function createAndFinalizeTx (psbt, toAddr, balance, networkFee, root, privKey, network) {
+function createAndFinalizeTx (psbt, toAddr, balance, networkFee, ecKeys, privKey2, network) {
   // balance and network fee are in COIN
 
   const val = balance - networkFee
@@ -177,8 +169,8 @@ function createAndFinalizeTx (psbt, toAddr, balance, networkFee, root, privKey, 
   })
 
   for (let i = 0; i < psbt.txInputs.length; i++) {
-    psbt.signInputHD(i, root)
-    psbt.signInput(i, bitcoin.ECPair.fromWIF(privKey, network))
+    psbt.signInput(i, ecKeys[i])
+    psbt.signInput(i, bitcoin.ECPair.fromWIF(privKey2, network))
   }
 
   psbt.finalizeAllInputs()
