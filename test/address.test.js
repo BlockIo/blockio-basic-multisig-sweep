@@ -20,15 +20,15 @@ describe('Address generation', () => {
       expect(pubKey2).to.equal(expectedPubKey)
     })
     it('got correct default address for BTCTEST at m/0/0', () => {
-      const p2shAddr = AddressService.generateAddress(constants.P2SH, bip32Priv, pubKey2, network, 'm/0/0').address
-      const p2wshP2shAddr = AddressService.generateAddress(constants.P2WSH_P2SH, bip32Priv, pubKey2, network, 'm/0/0').address
+      const p2shAddr = AddressService.generateAddress(constants.P2SH, bip32Priv, pubKey2, network, 0, 'm/i/0').output.address
+      const p2wshP2shAddr = AddressService.generateAddress(constants.P2WSH_P2SH, bip32Priv, pubKey2, network, 0, 'm/i/0').output.address
       expect(expectedDefaultAddr).to.be.oneOf([p2shAddr, p2wshP2shAddr])
     })
     it('got correct P2WSH-P2SH address for BTCTEST at m/1/0', () => {
-      expect(AddressService.generateAddress(constants.P2WSH_P2SH, bip32Priv, pubKey2, network, 'm/1/0').address).to.equal(expectedSubsequentAddr)
+      expect(AddressService.generateAddress(constants.P2WSH_P2SH, bip32Priv, pubKey2, network, 1, 'm/i/0').output.address).to.equal(expectedSubsequentAddr)
     })
     it('got correct witness_v0 address for BTCTEST at m/2/0', () => {
-      expect(AddressService.generateAddress(constants.P2WSH, bip32Priv, pubKey2, network, 'm/2/0').address).to.equal(expectedWitnessV0Addr)
+      expect(AddressService.generateAddress(constants.P2WSH, bip32Priv, pubKey2, network, 2, 'm/i/0').output.address).to.equal(expectedWitnessV0Addr)
     })
   })
   describe('LTC:', () => {
@@ -46,15 +46,15 @@ describe('Address generation', () => {
       expect(pubKey2).to.equal(expectedPubKey)
     })
     it('got correct default address for LTCTEST at m/0/0', () => {
-      const p2shAddr = AddressService.generateAddress(constants.P2SH, bip32Priv, pubKey2, network, 'm/0/0').address
-      const p2wshP2shAddr = AddressService.generateAddress(constants.P2WSH_P2SH, bip32Priv, pubKey2, network, 'm/0/0').address
+      const p2shAddr = AddressService.generateAddress(constants.P2SH, bip32Priv, pubKey2, network, 0, 'm/i/0').output.address
+      const p2wshP2shAddr = AddressService.generateAddress(constants.P2WSH_P2SH, bip32Priv, pubKey2, network, 0, 'm/i/0').output.address
       expect(expectedDefaultAddr).to.be.oneOf([p2shAddr, p2wshP2shAddr])
     })
     it('got correct P2WSH-P2SH address for LTCTEST at m/3/0', () => {
-      expect(AddressService.generateAddress(constants.P2WSH_P2SH, bip32Priv, pubKey2, network, 'm/3/0').address).to.equal(expectedSubsequentAddr)
+      expect(AddressService.generateAddress(constants.P2WSH_P2SH, bip32Priv, pubKey2, network, 3, 'm/i/0').output.address).to.equal(expectedSubsequentAddr)
     })
     it('got correct witness_v0 address for LTCTEST at m/2/0', () => {
-      expect(AddressService.generateAddress(constants.P2WSH, bip32Priv, pubKey2, network, 'm/2/0').address).to.equal(expectedWitnessV0Addr)
+      expect(AddressService.generateAddress(constants.P2WSH, bip32Priv, pubKey2, network, 2, 'm/i/0').output.address).to.equal(expectedWitnessV0Addr)
     })
   })
   describe('DOGE:', () => {
@@ -71,10 +71,10 @@ describe('Address generation', () => {
       expect(pubKey2).to.equal(expectedPubKey)
     })
     it('got correct default address for DOGETEST at m/0/0', () => {
-      expect(AddressService.generateAddress(constants.P2SH, bip32Priv, pubKey2, network, 'm/0/0').address).to.equal(expectedDefaultAddr)
+      expect(AddressService.generateAddress(constants.P2SH, bip32Priv, pubKey2, network, 0, 'm/i/0').output.address).to.equal(expectedDefaultAddr)
     })
     it('got correct P2SH address for DOGETEST at m/1/0', () => {
-      expect(AddressService.generateAddress(constants.P2SH, bip32Priv, pubKey2, network, 'm/1/0').address).to.equal(expectedSubsequentAddr)
+      expect(AddressService.generateAddress(constants.P2SH, bip32Priv, pubKey2, network, 1, 'm/i/0').output.address).to.equal(expectedSubsequentAddr)
     })
   })
 })

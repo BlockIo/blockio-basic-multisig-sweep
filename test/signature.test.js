@@ -10,8 +10,9 @@ describe('Signatures', () => {
   const bip32Priv = 'tgpv1aRS3XcGkbKXEipK7MuD3HhwzSt7b4iHoFfNvxRcaxTKYnot9Uts6rAgvAWQctDEUmgibk6wRsdffk9aQnV6UBQ36JDT5xrc9uVA17XEhR4'
   const privKey2 = 'cjzPVYRThMUnU3bDRAfnxZ6g6pCRgAe2wNTpUunwYQasN7whVuDn'
 
+  const derivationPath = 'm/i/0'
   const path = 'm/0/0'
-  const payment = AddressService.generateAddress(constants.P2SH, bip32Priv, bitcoin.ECPair.fromWIF(privKey2, network).publicKey, network, path)
+  const payment = AddressService.generateAddress(constants.P2SH, bip32Priv, bitcoin.ECPair.fromWIF(privKey2, network).publicKey, network, 0, derivationPath).output
   const hdRoot = bitcoin.bip32.fromBase58(bip32Priv, network)
   const masterFingerprint = hdRoot.fingerprint
 
@@ -22,7 +23,7 @@ describe('Signatures', () => {
     bip32Derivation: [
       {
         masterFingerprint,
-        path,
+        path: path,
         pubkey
       }
     ]
