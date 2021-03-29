@@ -215,23 +215,37 @@ function getCoinValue (floatAsString) {
 
 async function createBalanceMap (n, bip32Priv, pubKey, networkObj, network, derivationPath, providerService) {
   const balanceMap = {}
+  let recalculateForNonStandard
+
   for (let i = 0; i <= n; i++) {
     console.log('Evaluating addresses at i=' + i)
     if (network !== constants.NETWORKS.DOGE && network !== constants.NETWORKS.DOGETEST) {
-      await addAddrToMap(balanceMap, constants.P2WSH_P2SH, i, bip32Priv, pubKey, networkObj, derivationPath, providerService)
-      await addAddrToMap(balanceMap, constants.P2WSH, i, bip32Priv, pubKey, networkObj, derivationPath, providerService)
+      /**
+       * initally, calculate addresses for standard derivation
+       * if standard and nonstandard derived pubkeys don't match, recalculate
+       */
+      recalculateForNonStandard = await addAddrToMap(balanceMap, constants.P2WSH_P2SH, i, bip32Priv, pubKey, networkObj, derivationPath, providerService, false)
+      await addAddrToMap(balanceMap, constants.P2WSH, i, bip32Priv, pubKey, networkObj, derivationPath, providerService, false)
+      if (recalculateForNonStandard) {
+        await addAddrToMap(balanceMap, constants.P2WSH_P2SH, i, bip32Priv, pubKey, networkObj, derivationPath, providerService, recalculateForNonStandard)
+        await addAddrToMap(balanceMap, constants.P2WSH, i, bip32Priv, pubKey, networkObj, derivationPath, providerService, recalculateForNonStandard)
+      }
     }
-    await addAddrToMap(balanceMap, constants.P2SH, i, bip32Priv, pubKey, networkObj, derivationPath, providerService)
+    await addAddrToMap(balanceMap, constants.P2SH, i, bip32Priv, pubKey, networkObj, derivationPath, providerService, false)
+    if (recalculateForNonStandard) {
+      await addAddrToMap(balanceMap, constants.P2SH, i, bip32Priv, pubKey, networkObj, derivationPath, providerService, recalculateForNonStandard)
+    }
   }
 
   return balanceMap
 }
 
-async function addAddrToMap (balanceMap, addrType, i, bip32Priv, pubKey, networkObj, derivationPath, providerService) {
-  const returnObj = AddressService.generateAddress(addrType, bip32Priv, pubKey, networkObj, i, derivationPath)
+async function addAddrToMap (balanceMap, addrType, i, bip32Priv, pubKey, networkObj, derivationPath, providerService, recalculate) {
+  const returnObj = AddressService.generateAddress(addrType, bip32Priv, pubKey, networkObj, i, derivationPath, recalculate)
+  const recalculateForNonStandard = returnObj.recalculateForNonStandard
   const isStandard = returnObj.isStandard
   const payment = returnObj.output
-  console.log('type=' + addrType + ' address=' + payment.address)
+  console.log('type=' + addrType + ' address=' + payment.address + ' isStandardDerived=' + isStandard)
   balanceMap[payment.address] = {}
   balanceMap[payment.address].address_type = addrType
 
@@ -273,6 +287,7 @@ async function addAddrToMap (balanceMap, addrType, i, bip32Priv, pubKey, network
   if (!balanceMap[payment.address].tx.length) {
     delete balanceMap[payment.address]
   }
+  return recalculateForNonStandard
 }
 
 function promptConfirmation (query) {

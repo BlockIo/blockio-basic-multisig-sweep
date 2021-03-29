@@ -3,7 +3,7 @@ const fetch = require('node-fetch')
 
 const AddressService = function () { }
 
-AddressService.prototype.generateAddress = (addrType, bip32PrivKey, secondaryPubKey, network, i, derivationPath) => {
+AddressService.prototype.generateAddress = (addrType, bip32PrivKey, secondaryPubKey, network, i, derivationPath, calculateNonStandard) => {
   // generates P2SH, P2WSH-P2SH, or WITNESS_V0 addresses
 
   const derivPath = derivationPath.replace('i', i.toString())
@@ -19,10 +19,16 @@ AddressService.prototype.generateAddress = (addrType, bip32PrivKey, secondaryPub
 
   let PUB1 = leafStandard.publicKey
   let isStandard = true
+  let recalculateForNonStandard = false
   if (leafNonStandard.publicKey.toString('hex') !== leafStandard.publicKey.toString('hex')) {
-    // will use non standard pubKey
-    PUB1 = leafNonStandard.publicKey
-    isStandard = false
+    // will use non standard pubKey if calculateNonStandard set
+    // if not set, then set it for next iteration
+    if (calculateNonStandard) {
+      PUB1 = leafNonStandard.publicKey
+      isStandard = false
+    } else {
+      recalculateForNonStandard = true
+    }
   }
 
   const PUB2 = Buffer.from(secondaryPubKey, 'hex')
@@ -46,7 +52,7 @@ AddressService.prototype.generateAddress = (addrType, bip32PrivKey, secondaryPub
     throw new Error('Address type must be P2SH, P2WSH-P2SH, or WITNESS_0')
   }
 
-  return { output, isStandard }
+  return { output, isStandard, recalculateForNonStandard }
 }
 
 AddressService.prototype.checkBlockioAddressBalance = async (apiUrl) => {
