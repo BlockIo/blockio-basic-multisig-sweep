@@ -10,9 +10,9 @@ Command-line Usage:
 ```
 $ git clone <repository URL>
 $ cd <dir> && npm install
-$ N=10 PRIVATE_KEY1_BIP32= PRIVATE_KEY2= DESTINATION_ADDR= NETWORK= DERIVATION_PATH= node example.js
+$ N= PRIVATE_KEY1_BIP32= PRIVATE_KEY2= DESTINATION_ADDR= NETWORK= DERIVATION_PATH= node example.js
 ```
-* N is the number of maximum addresses you've generated on the given network
+* N is the number of addresses you've generated on the given network
 * PRIVATE_KEY1_BIP32 is the BIP32 extended private key you backed up
 * PRIVATE_KEY2 is the second private key you backed up
 * DESTINATION_ADDR is where you want the swept coins to go
