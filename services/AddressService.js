@@ -45,15 +45,4 @@ AddressService.prototype.generateAddresses = (addrType, bip32PrivKey, secondaryP
     return outputs
 }
 
-AddressService.prototype.checkBlockioAddressBalance = async (apiUrl) => {
-  try {
-    const res = await fetch(apiUrl)
-    const json = await res.json()
-
-    return json
-  } catch (err) {
-    throw new Error(err.response.body)
-  }
-}
-
 module.exports = new AddressService()
