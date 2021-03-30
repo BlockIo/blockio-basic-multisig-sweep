@@ -1,5 +1,5 @@
 {
-  "name": "v2-blockio-multisig-sweep",
+  "name": "blockio-basic-multisig-sweep",
   "version": "1.0.0",
   "description": "",
   "main": "example.js",
