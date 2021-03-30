@@ -9,7 +9,7 @@ AddressService.prototype.generateAddresses = (addrType, bip32PrivKey, secondaryP
 
     let outputs = []
 
-    for (var chainCodeType of ["standard", "nonstandard"]) {
+    for (let chainCodeType of ["standard", "nonstandard"]) {
 	// get addresses with both standard and non-standard chain codes
 	
 	let output
