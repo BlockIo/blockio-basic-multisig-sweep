@@ -58,8 +58,6 @@ BlockIoSweep.prototype.begin = async function () {
 	throw new Error('Destination address not provided')
     }
 
-    console.log(this.derivationPath)
-    
     if (!this.derivationPath) {
 	throw new Error('Must specify DERIVATION_PATH')
     }
