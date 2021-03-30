@@ -1,4 +1,4 @@
-const Sweeper = require('./sweeper')
+const Sweeper = require('./src/sweeper')
 require('dotenv').config()
 
 const n = process.env.N
