@@ -1,8 +1,8 @@
 const expect = require('chai').expect
 const bitcoin = require('bitcoinjs-lib')
-const networks = require('../networks')
-const constants = require('../constants')
-const AddressService = require('../services/AddressService')
+const networks = require('../src/networks')
+const constants = require('../src/constants')
+const AddressService = require('../src/services/AddressService')
 
 describe('Signatures', () => {
   const network = networks[constants.NETWORKS.DOGETEST]

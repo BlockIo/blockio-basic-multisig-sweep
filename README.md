@@ -1,4 +1,4 @@
-* **WORK IN PROGRESS. BE CAREFUL!**  
+* **ThIS IS BETA SOFTWARE. BE CAREFUL!**
 * Reference sweep script for Basic (2-of-2) MultiSig wallets. NodeJS.  
 * Uses [SoChain's Free API](https://sochain.com/api) by default for blockchain data and for broadcasting transactions. You can implement your own backends yourself.  
 * Tested with NodeJS v14 v15. 

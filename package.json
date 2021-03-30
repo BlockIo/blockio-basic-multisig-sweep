@@ -1,21 +1,21 @@
 {
-  "name": "sweep_to_addr",
+  "name": "v2-blockio-multisig-sweep",
   "version": "1.0.0",
   "description": "",
-  "main": "main.js",
+  "main": "example.js",
   "scripts": {
     "test": "mocha"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nwasiq/sweep_to_addr.git"
+    "url": "https://github.com/BlockIo/blockio-basic-multisig-sweep.git"
   },
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
-    "url": "https://github.com/nwasiq/sweep_to_addr/issues"
+    "url": "https://github.com/BlockIo/blockio-basic-multisig-sweep/issues"
   },
-  "homepage": "https://github.com/nwasiq/sweep_to_addr#readme",
+  "homepage": "https://github.com/BlockIo/blockio-basic-multisig-sweep#readme",
   "dependencies": {
     "bitcoinjs-lib": "^5.2.0",
     "chai": "^4.3.4",
