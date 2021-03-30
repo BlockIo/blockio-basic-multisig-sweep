@@ -12,7 +12,7 @@ describe('Signatures', () => {
 
   const derivationPath = 'm/i/0'
   const path = 'm/0/0'
-  const payment = AddressService.generateAddress(constants.P2SH, bip32Priv, bitcoin.ECPair.fromWIF(privKey2, network).publicKey, network, 0, derivationPath).output
+  const payment = AddressService.generateAddresses(constants.P2SH, bip32Priv, bitcoin.ECPair.fromWIF(privKey2, network).publicKey, network, 0, derivationPath)[0].payment
   const hdRoot = bitcoin.bip32.fromBase58(bip32Priv, network)
   const masterFingerprint = hdRoot.fingerprint
 

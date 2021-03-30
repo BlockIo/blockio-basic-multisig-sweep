@@ -18,7 +18,7 @@ module.exports = {
   PROVIDER_URLS: {
     SOCHAIN: {
       URL: 'https://sochain.com/api/v2',
-      SUPPORT: ['BTC', 'LTC', 'DOGE', 'BTCTEST']
+	SUPPORT: ['BTC', 'LTC', 'DOGE', 'BTCTEST', 'DOGETEST', 'LTCTEST']
     },
     MEMPOOLSPACE: {
       URL: 'https://mempool.space',
