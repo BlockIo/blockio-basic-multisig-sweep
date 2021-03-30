@@ -1,3 +1,5 @@
+// network definitions
+
 module.exports = {
   BTC: {
     messagePrefix: '\x18Bitcoin Signed Message:\n',
