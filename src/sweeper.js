@@ -5,6 +5,8 @@ const AddressService = require('./services/AddressService')
 const ProviderService = require('./services/ProviderService')
 const fetch = require('node-fetch')
 const bitcoin = require('bitcoinjs-lib')
+const ecpair = require('ecpair');
+const bip32 = require('bip32');
 
 function BlockIoSweep (network, bip32_private_key_1, private_key_2, destination_address, n, derivation_path, options) {
     // TODO perform error checking on all these inputs
@@ -69,7 +71,7 @@ BlockIoSweep.prototype.begin = async function () {
     try {
 	
 	// get the public key from the user-specified private key
-	const publicKey2 = bitcoin.ECPair.fromWIF(this.privateKey2, this.networkObj).publicKey.toString('hex')
+	const publicKey2 = ecpair.ECPair.fromWIF(this.privateKey2, this.networkObj).publicKey.toString('hex')
 	
 	// generate addresses for the N paths and initiate a utxo
 	const utxoMap = await createBalanceMap(this.n, this.bip32PrivKey, publicKey2, this.networkObj, this.network, this.derivationPath, this.providerService)
@@ -78,7 +80,7 @@ BlockIoSweep.prototype.begin = async function () {
 	
 	let psbt = new bitcoin.Psbt({ network: this.networkObj })
 	
-	const root = bitcoin.bip32.fromBase58(this.bip32PrivKey, this.networkObj)
+	const root = bip32.fromBase58(this.bip32PrivKey, this.networkObj)
 	let ecKeys = {}
 	
 	let balToSweep = 0
@@ -185,7 +187,7 @@ function createAndFinalizeTx (psbt, toAddr, balance, networkFee, ecKeys, privKey
 
   for (let i = 0; i < psbt.txInputs.length; i++) {
     psbt.signInput(i, ecKeys[i])
-    psbt.signInput(i, bitcoin.ECPair.fromWIF(privKey2, network))
+    psbt.signInput(i, ecpair.ECPair.fromWIF(privKey2, network))
   }
 
   psbt.finalizeAllInputs()
@@ -195,14 +197,7 @@ function getNetworkFee (network, psbt, feeRate) {
   const tx = psbt.extractTransaction()
   const vSize = tx.virtualSize() // in bytes
 
-  let f
-
-  if (network === constants.NETWORKS.DOGE || network === constants.NETWORKS.DOGETEST) {
-    // ignore fee rate for DOGE and DOGETEST
-    f = parseInt(constants.COIN) * Math.ceil(vSize / 1000)
-  } else {
-    f = feeRate * vSize
-  }
+  let f = feeRate * vSize
 
   return f
 }

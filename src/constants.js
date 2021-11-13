@@ -40,7 +40,7 @@ module.exports = {
   DUST: {
     BTC: 546,
     LTC: 1000,
-    DOGE: 1
+    DOGE: 1000000 // https://github.com/dogecoin/dogecoin/blob/v1.14.5/doc/fee-recommendation.md
   },
   NETWORK_FEE_MAX: {
     BTC: (250 * 100000), // 0.25 BTC

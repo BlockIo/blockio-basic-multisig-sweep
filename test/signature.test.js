@@ -1,5 +1,7 @@
 const expect = require('chai').expect
 const bitcoin = require('bitcoinjs-lib')
+const bip32 = require('bip32')
+const ecpair = require('ecpair')
 const networks = require('../src/networks')
 const constants = require('../src/constants')
 const AddressService = require('../src/services/AddressService')
@@ -12,13 +14,17 @@ describe('Signatures', () => {
 
   const derivationPath = 'm/i/0'
   const path = 'm/0/0'
-  const payment = AddressService.generateAddresses(constants.P2SH, bip32Priv, bitcoin.ECPair.fromWIF(privKey2, network).publicKey, network, 0, derivationPath)[0].payment
-  const hdRoot = bitcoin.bip32.fromBase58(bip32Priv, network)
+  const payment = AddressService.generateAddresses(constants.P2SH, bip32Priv, ecpair.ECPair.fromWIF(privKey2, network).publicKey, network, 0, derivationPath)[0].payment
+  const hdRoot = bip32.fromBase58(bip32Priv, network)
   const masterFingerprint = hdRoot.fingerprint
 
   const childNode = hdRoot.derivePath(path)
   const pubkey = childNode.publicKey
 
+  function validator(pubkey, msghash, signature) {
+    return ecpair.ECPair.fromPublicKey(pubkey).verify(msghash, signature);
+  }
+  
   const updateData = {
     bip32Derivation: [
       {
@@ -35,9 +41,9 @@ describe('Signatures', () => {
   psbt.addInput({ hash: txId, index: 0, nonWitnessUtxo, redeemScript })
   psbt.updateInput(0, updateData)
   psbt.signInputHD(0, hdRoot)
-  psbt.signInput(0, bitcoin.ECPair.fromWIF(privKey2, network))
+  psbt.signInput(0, ecpair.ECPair.fromWIF(privKey2, network))
 
   it('Check if generated signatures for a BIP 32 private key and a secondary private key are valid', () => {
-    expect(psbt.validateSignaturesOfInput(0)).to.equal(true)
+    expect(psbt.validateSignaturesOfInput(0, validator, ecpair.ECPair.fromWIF(privKey2, network).publicKey)).to.equal(true)
   })
 })

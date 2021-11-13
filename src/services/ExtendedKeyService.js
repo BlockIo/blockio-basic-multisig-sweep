@@ -1,7 +1,8 @@
 // service for key derivation from BIP32 paths
 
 const bitcoin = require('bitcoinjs-lib')
-
+const bip32 = require('bip32');
+const ecpair = require('ecpair');
 const ExtendedKeyService = function () { }
 
 ExtendedKeyService.prototype.getKeyAtPath = (bip32PrivKey, network, i, derivationPath, chainCodeType) => {
@@ -10,7 +11,7 @@ ExtendedKeyService.prototype.getKeyAtPath = (bip32PrivKey, network, i, derivatio
     let pathParts = derivationPath.split('/')
     
     // m
-    const extendedKey = bitcoin.bip32.fromBase58(bip32PrivKey, network)
+    const extendedKey = bip32.fromBase58(bip32PrivKey, network)
 
     if (chainCodeType === "nonstandard") { extendedKey.chainCode = Buffer.from(extendedKey.chainCode.toString('hex').replace(/^(00)+/,''), 'hex') }
 
@@ -22,7 +23,7 @@ ExtendedKeyService.prototype.getKeyAtPath = (bip32PrivKey, network, i, derivatio
     // m/i/j
     let leaf = child.derive(pathParts[2] === 'i' ? i : parseInt(pathParts[2]))
 
-    return bitcoin.ECPair.fromPrivateKey(leaf.privateKey, { network: network })
+    return ecpair.ECPair.fromPrivateKey(leaf.privateKey, { network: network })
 
 }
 

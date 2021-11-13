@@ -1,6 +1,6 @@
 {
   "name": "blockio-basic-multisig-sweep",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "",
   "main": "example.js",
   "scripts": {
@@ -17,9 +17,14 @@
   },
   "homepage": "https://github.com/BlockIo/blockio-basic-multisig-sweep#readme",
   "dependencies": {
-    "bitcoinjs-lib": "^5.2.0",
+    "bitcoinjs-lib": "^6.0.0",
+    "ecpair": "^1.0.1",
+    "bip32": "^2.0.6",
     "chai": "^4.3.4",
-    "mocha": "^8.3.2",
-    "node-fetch": "^2.6.1"
+    "mocha": "^8.4.0",
+    "node-fetch": "^2.6.6"
+  },
+  "engines": {
+    "node": "^17 || ^16 || ^15 || ^14 || ^13 || ^12"
   }
 }
