@@ -20,11 +20,11 @@ function BlockIoSweep (network, bip32_private_key_1, private_key_2, destination_
     
     if (options && typeof (options) === 'object') {
 	this.provider = options.provider || BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER
-	this.feeRate = options.feeRate || BlockIoSweep.DEFAULT_FEE_RATE
+	this.feeRate = options.feeRate || BlockIoSweep.DEFAULT_FEE_RATE[network]
 	this.maxTxInputs = options.maxTxInputs || BlockIoSweep.DEFAULT_MAX_TX_INPUTS
     } else {
 	this.provider = BlockIoSweep.DEFAULT_BLOCKCHAIN_PROVIDER
-	this.feeRate = BlockIoSweep.DEFAULT_FEE_RATE
+	this.feeRate = BlockIoSweep.DEFAULT_FEE_RATE[network]
 	this.maxTxInputs = BlockIoSweep.DEFAULT_MAX_TX_INPUTS
     }
     this.providerService = new ProviderService(this.provider, this.network)
