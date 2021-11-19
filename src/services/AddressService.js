@@ -1,6 +1,5 @@
 const bitcoin = require('bitcoinjs-lib')
 const ExtendedKeyService = require('./ExtendedKeyService')
-const fetch = require('node-fetch')
 
 const AddressService = function () { }
 

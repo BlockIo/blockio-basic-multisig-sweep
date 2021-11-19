@@ -1,5 +1,6 @@
 const constants = require('../constants')
 const fetch = require('node-fetch')
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 const ProviderService = function (provider, network) {
   const providerIndex = Object.values(constants.PROVIDERS).indexOf(provider)
@@ -105,7 +106,14 @@ module.exports = ProviderService
 
 async function fetchUrl (url) {
   try {
-    return await fetch(url)
+    let response = await fetch(url)
+    if (response.ok) {
+      return response;
+    } else {
+      console.log(" -- retrying in 10 seconds due to status = " + response.status);
+      await delay(10000);
+      return await fetchUrl(url);
+    }
   } catch (err) {
     throw new Error(err)
   }

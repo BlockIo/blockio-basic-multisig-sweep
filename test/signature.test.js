@@ -4,6 +4,7 @@ const bip32 = require('bip32')
 const ecpair = require('ecpair')
 const networks = require('../src/networks')
 const constants = require('../src/constants')
+const ecc = require('tiny-secp256k1')
 const AddressService = require('../src/services/AddressService')
 
 describe('Signatures', () => {
@@ -15,7 +16,7 @@ describe('Signatures', () => {
   const derivationPath = 'm/i/0'
   const path = 'm/0/0'
   const payment = AddressService.generateAddresses(constants.P2SH, bip32Priv, ecpair.ECPair.fromWIF(privKey2, network).publicKey, network, 0, derivationPath)[0].payment
-  const hdRoot = bip32.fromBase58(bip32Priv, network)
+  const hdRoot = bip32.default(ecc).fromBase58(bip32Priv, network)
   const masterFingerprint = hdRoot.fingerprint
 
   const childNode = hdRoot.derivePath(path)

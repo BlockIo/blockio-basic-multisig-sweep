@@ -3,10 +3,10 @@ const constants = require('./constants')
 const networks = require('./networks')
 const AddressService = require('./services/AddressService')
 const ProviderService = require('./services/ProviderService')
-const fetch = require('node-fetch')
 const bitcoin = require('bitcoinjs-lib')
 const ecpair = require('ecpair');
 const bip32 = require('bip32');
+const ecc = require('tiny-secp256k1');
 
 function BlockIoSweep (network, bip32_private_key_1, private_key_2, destination_address, n, derivation_path, options) {
     // TODO perform error checking on all these inputs
@@ -80,7 +80,7 @@ BlockIoSweep.prototype.begin = async function () {
 	
 	let psbt = new bitcoin.Psbt({ network: this.networkObj })
 	
-	const root = bip32.fromBase58(this.bip32PrivKey, this.networkObj)
+	const root = bip32.default(ecc).fromBase58(this.bip32PrivKey, this.networkObj)
 	let ecKeys = {}
 	
 	let balToSweep = 0
