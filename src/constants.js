@@ -1,18 +1,15 @@
 module.exports = {
-  P2WSH_P2SH: 'P2WSH-P2SH',
+  P2WSH_P2SH: 'P2WSH_P2SH',
   P2SH: 'P2SH',
-  P2WSH: 'WITNESS_V0',
+  P2WSH: 'P2WSH',
   COIN: '100000000',
   N: 100,
   MAX_TX_INPUTS: 500,
-  BLOCKCHAIN_PROVIDER_DEFAULT: 'sochain',
-  BLOCKCHAIN_PROVIDER_URL_DEFAULT: 'https://sochain.com/api/v2/',
+  BLOCKCHAIN_PROVIDER_DEFAULT: 'mempoolspace',
   // the order of provider names matters in PROVIDERS and PROVIDER_URLS
   // the order needs to be the same
   PROVIDERS: {
-    SOCHAIN: 'sochain',
     MEMPOOLSPACE: 'mempoolspace',
-    BLOCKCHAINCOM: 'blockchaincom'
   },
   PROVIDER_URLS: {
     SOCHAIN: {

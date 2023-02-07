@@ -1,4 +1,5 @@
 const Sweeper = require('./src/sweeper')
+require('dotenv').config()
 
 const n = process.env.N
 const bip32 = process.env.PRIVATE_KEY1_BIP32
