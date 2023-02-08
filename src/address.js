@@ -2,7 +2,7 @@ const bitcoin = require('bitcoinjs-lib')
 const networks = require("./networks");
 
 class Address {
-  async generateAddresses(
+  generateAddresses(
     bip32PrivKey,
     secondaryPubKey,
     network,
@@ -21,7 +21,7 @@ class Address {
     throw new Error("MUST OVERRIDE");
   }
 
-  async toOutputScript(address, network) {
+  toOutputScript(address, network) {
     return bitcoin.address.toOutputScript(address, networks[network])
   }
 }

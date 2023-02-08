@@ -4,7 +4,7 @@ const { GetKeyAtPath } = require("../utils/extendedKey");
 const bitcoin = require('bitcoinjs-lib')
 
 class P2SH extends Address {
-  async generateAddresses(
+  generateAddresses(
     bip32PrivKey,
     secondaryPubKey,
     network,
@@ -53,7 +53,6 @@ class P2SH extends Address {
       // remove duplicate if standard and non-standard derivations match
       outputs.shift();
     }
-
     return outputs;
   }
 

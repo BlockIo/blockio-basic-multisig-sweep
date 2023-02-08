@@ -4,7 +4,7 @@ const bitcoin = require('bitcoinjs-lib');
 const constants = require("../constants");
 
 class P2WSH_P2SH extends Address {
-  async generateAddresses(
+  generateAddresses(
     bip32PrivKey,
     secondaryPubKey,
     network,

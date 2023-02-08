@@ -5,9 +5,13 @@ const ecpair = require('ecpair')
 const networks = require('../src/networks')
 const constants = require('../src/constants')
 const ecc = require('tiny-secp256k1')
-const AddressService = require('../src/services/AddressService')
+
+const P2SH = require("../src/addresses/p2sh");
 
 describe('Signatures', () => {
+  const supportedAddresses = {};
+  supportedAddresses[constants.P2SH] = new P2SH();
+
   const network = networks[constants.NETWORKS.DOGETEST]
   const psbt = new bitcoin.Psbt({ network: network })
   const bip32Priv = 'tgpv1aRS3XcGkbKXEipK7MuD3HhwzSt7b4iHoFfNvxRcaxTKYnot9Uts6rAgvAWQctDEUmgibk6wRsdffk9aQnV6UBQ36JDT5xrc9uVA17XEhR4'
@@ -15,7 +19,7 @@ describe('Signatures', () => {
 
   const derivationPath = 'm/i/0'
   const path = 'm/0/0'
-  const payment = AddressService.generateAddresses(constants.P2SH, bip32Priv, ecpair.ECPair.fromWIF(privKey2, network).publicKey, network, 0, derivationPath)[0].payment
+  const payment = supportedAddresses[constants.P2SH].generateAddresses(bip32Priv, ecpair.ECPair.fromWIF(privKey2, network).publicKey, network, 0, derivationPath)[0].payment
   const hdRoot = bip32.default(ecc).fromBase58(bip32Priv, network)
   const masterFingerprint = hdRoot.fingerprint
 

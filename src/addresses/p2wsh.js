@@ -4,7 +4,7 @@ const bitcoin = require('bitcoinjs-lib');
 const constants = require("../constants");
 
 class P2WSH extends Address {
-  async generateAddresses(
+  generateAddresses(
     bip32PrivKey,
     secondaryPubKey,
     network,
@@ -81,7 +81,7 @@ class P2WSH extends Address {
       unspentObj.value = x.value;
 
       unspentObj.witnessUtxo = {
-        script: Buffer.from(await this.toOutputScript(address, network), "hex"),
+        script: Buffer.from(this.toOutputScript(address, network), "hex"),
         value: x.value,
       };
       unspentObj.witnessScript = payment.redeem.output;

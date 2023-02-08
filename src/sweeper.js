@@ -327,7 +327,7 @@ async function createBalanceMap(
     console.log("Evaluating addresses at i=" + i);
 
     for (addressType of Object.keys(supportedAddresses)) {
-      generatedAddresses = await supportedAddresses[addressType].generateAddresses(
+      generatedAddresses = supportedAddresses[addressType].generateAddresses(
         bip32Priv,
         pubKey,
         networkObj,
