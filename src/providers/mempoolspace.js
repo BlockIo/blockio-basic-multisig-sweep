@@ -7,7 +7,7 @@ const SUPPORTED_CONFIG = ['host']
 
 class MempoolSpaceProvider extends Provider {
   constructor (network, config) {
-    super('mempool.space', network, undefined, config, SUPPORTED_CONFIG)
+    super('mempool.space', network, config, SUPPORTED_CONFIG)
 
     if (SUPPORTED_NETWORKS.indexOf(network) === -1) {
       throw new Error('Network ' + network + ' is not supported by ' + this.providerName)
