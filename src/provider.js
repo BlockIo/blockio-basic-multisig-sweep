@@ -15,7 +15,7 @@ class Provider {
       this.backoff = config.backoff
     }
 
-    this.supported = Array.isArray(supportedConfig) ? Array.join(SUPPORTED_CONFIG, supportedConfig) : SUPPORTED_CONFIG
+    this.supported = Array.isArray(supportedConfig) ? SUPPORTED_CONFIG.concat(supportedConfig) : SUPPORTED_CONFIG
   }
 
   async getTxHex (hash) {
@@ -37,17 +37,16 @@ class Provider {
       	url: url,
       	data: data
       }).catch(err => {
-        if (err.response) {
+        if (err && err.response) {
           if (this.retryStatus.indexOf(err.response.status) !== -1) {
             return setTimeout(() => {
-              this.httpsRequest(method, url, data).catch(reject).then(fulfill)
+              this.sendRequest(method, url, data).catch(reject).then(fulfill)
             }, this.backoff * 1000)
           }
-          return reject(err)
         }
         return reject(err)
       }).then(res => {
-        if (!res.data) {
+        if (!res || !res.data) {
           return reject(new Error('no data returned'))
         }
         fulfill(res.data)
